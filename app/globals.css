@@ -3,6 +3,28 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Custom design tokens */
+  --emerald-glow: 158 64% 52%;
+  --glass-bg: 0 0% 100% / 0.7;
+  --glass-border: 0 0% 100% / 0.3;
+
+  --gradient-hero: linear-gradient(
+    135deg,
+    hsl(158 64% 45%) 0%,
+    hsl(165 60% 35%) 50%,
+    hsl(172 55% 30%) 100%
+  );
+
+  --gradient-subtle: linear-gradient(
+    180deg,
+    hsl(150 20% 99%) 0%,
+    hsl(150 15% 96%) 100%
+  );
+
+  --shadow-soft: 0 4px 20px -4px hsl(158 64% 42% / 0.15);
+  --shadow-glow: 0 0 40px hsl(158 64% 52% / 0.25);
+  --shadow-card: 0 8px 32px -8px hsl(150 30% 10% / 0.1);
 }
 
 @theme inline {
@@ -12,15 +34,87 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Utility classes */
+.glass {
+  @apply backdrop-blur-xl border;
+  background: hsl(var(--glass-bg));
+  border-color: hsl(var(--glass-border));
+}
+
+.gradient-hero {
+  background: var(--gradient-hero);
+}
+
+.shadow-soft {
+  box-shadow: var(--shadow-soft);
+}
+
+.shadow-glow {
+  box-shadow: var(--shadow-glow);
+}
+
+.shadow-card {
+  box-shadow: var(--shadow-card);
+}
+
+.text-gradient {
+  @apply bg-clip-text text-transparent;
+  background-image: var(--gradient-hero);
+}
+
+/* Animations */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px hsl(158 64% 52% / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px hsl(158 64% 52% / 0.5);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.6s ease-out forwards;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animation-delay-100 {
+  animation-delay: 100ms;
+}
+.animation-delay-200 {
+  animation-delay: 200ms;
+}
+.animation-delay-300 {
+  animation-delay: 300ms;
+}
+.animation-delay-400 {
+  animation-delay: 400ms;
 }
