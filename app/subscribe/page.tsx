@@ -5,7 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { availablePlans } from "@/lib/plans";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import {
   Check,
@@ -28,6 +28,25 @@ type SubscribeResponse = {
 
 type SubscribeError = {
   error: string;
+};
+
+type SubscriptionCheckResponse = {
+  subscriptionActive: boolean;
+  hasAccess: boolean;
+  onTrial: boolean;
+  trialRemainingDays: number;
+  trialStarted?: boolean;
+  trialExpired?: boolean;
+  trialEndsAt?: string;
+  message?: string;
+};
+
+type StartTrialResponse = {
+  started: boolean;
+  message?: string;
+  error?: string;
+  trialStarted?: boolean;
+  trialExpired?: boolean;
 };
 
 const subscribeToPlan = async ({
@@ -145,9 +164,42 @@ export default function SubscribePage() {
   const { user } = useUser();
   const router = useRouter();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [trialInfo, setTrialInfo] = useState<SubscriptionCheckResponse | null>(
+    null
+  );
+  const [trialLoading, setTrialLoading] = useState(true);
 
   const userId = user?.id;
   const email = user?.emailAddresses?.[0]?.emailAddress || "";
+
+  const fetchTrialInfo = async () => {
+    if (!userId) {
+      setTrialInfo(null);
+      setTrialLoading(false);
+      return null;
+    }
+
+    setTrialLoading(true);
+    try {
+      const res = await fetch(`/api/check-subscription?userId=${userId}`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch subscription status.");
+      }
+      const data: SubscriptionCheckResponse = await res.json();
+      setTrialInfo(data);
+      return data;
+    } catch (error) {
+      console.error("Failed to fetch trial info:", error);
+      setTrialInfo(null);
+      return null;
+    } finally {
+      setTrialLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchTrialInfo();
+  }, [userId]);
 
   const mutation = useMutation<SubscribeResponse, Error, { planType: string }>({
     mutationFn: async ({ planType }) => {
@@ -170,6 +222,79 @@ export default function SubscribePage() {
     },
   });
 
+  const startTrialMutation = useMutation<StartTrialResponse, Error>({
+    mutationFn: async () => {
+      const res = await fetch("/api/start-trial", { method: "POST" });
+      const data = (await res.json()) as StartTrialResponse;
+      if (!res.ok) {
+        throw new Error(data.error || "Unable to start trial.");
+      }
+      return data;
+    },
+    onMutate: () => {
+      toast.loading("Starting your free trial...", { id: "start-trial" });
+    },
+    onSuccess: async (data) => {
+      if (data.started) {
+        toast.success("Your 7-day free trial has started!", {
+          id: "start-trial",
+        });
+        router.push("/mealplan");
+        return;
+      }
+
+      const latestInfo = await fetchTrialInfo();
+      if (latestInfo?.hasAccess) {
+        toast.success("Welcome back! Redirecting to your meal plan.", {
+          id: "start-trial",
+        });
+        router.push("/mealplan");
+        return;
+      }
+
+      if (latestInfo?.trialExpired || data.trialExpired) {
+        toast.error(
+          latestInfo?.message ||
+            data.message ||
+            "Your free trial has ended. Please subscribe to continue.",
+          { id: "start-trial" }
+        );
+        return;
+      }
+
+      toast(data.message || "Trial already started.", { id: "start-trial" });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Unable to start trial.", {
+        id: "start-trial",
+      });
+    },
+  });
+
+  const handleTrialAction = () => {
+    if (!userId) {
+      router.push("/sign-up");
+      return;
+    }
+
+    if (trialInfo?.subscriptionActive || trialInfo?.onTrial) {
+      router.push("/mealplan");
+      return;
+    }
+
+    if (trialInfo?.trialExpired) {
+      toast.error("Your free trial has ended. Choose a plan to continue.");
+      return;
+    }
+
+    startTrialMutation.mutate();
+  };
+
+  const isOnTrial = !!trialInfo?.onTrial;
+  const isSubscribed = !!trialInfo?.subscriptionActive;
+  const isTrialExpired = !!trialInfo?.trialExpired;
+  const isTrialStarted = isOnTrial || isSubscribed || !!trialInfo?.trialStarted;
+
   const handleSubscribe = (planType: string) => {
     if (!userId) {
       router.push("/sign-up");
@@ -179,37 +304,103 @@ export default function SubscribePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-emerald-50/30">
+    <div className="min-h-screen bg-[#f7fbf9]">
       <Toaster position="top-center" />
 
       {/* Hero Section */}
-      <div className="relative overflow-hidden px-4 pb-12 pt-20 sm:px-6 lg:px-8">
+      <div className="relative overflow-hidden px-6 pb-14 pt-10 sm:px-10 lg:px-16 2xl:px-20">
         {/* Background decoration */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute -top-40 right-0 h-[500px] w-[500px] rounded-full bg-emerald-100/50 blur-3xl" />
           <div className="absolute -bottom-40 left-0 h-[500px] w-[500px] rounded-full bg-teal-100/50 blur-3xl" />
         </div>
 
-        <div className="relative mx-auto max-w-4xl text-center">
+        <div className="relative mx-auto max-w-6xl text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-700">
             <Sparkles className="h-4 w-4" />
             <span>Simple, transparent pricing</span>
           </div>
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl">
+          <h1 className="text-5xl font-bold tracking-tight text-gray-900 sm:text-6xl lg:text-7xl">
             Choose your{" "}
             <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
               perfect plan
             </span>
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-600 sm:text-xl">
+          <p className="mx-auto mt-6 max-w-3xl text-xl text-gray-600 sm:text-2xl">
             Start with our weekly plan to explore, then upgrade when you're
             ready. All plans include full access to AI-powered meal planning.
           </p>
+
+          <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-emerald-200 bg-white/90 p-6 text-left shadow-lg backdrop-blur">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+                  7-Day Free Trial
+                </p>
+                <h2 className="mt-1 text-2xl font-bold text-gray-900">
+                  Start trial, then unlock meal plan generation
+                </h2>
+                {!userId && (
+                  <p className="mt-2 text-sm text-gray-600">
+                    Sign in first, then click start to activate your trial.
+                  </p>
+                )}
+                {userId && trialLoading && (
+                  <p className="mt-2 text-sm text-gray-600">
+                    Checking your trial status...
+                  </p>
+                )}
+                {userId && !trialLoading && isSubscribed && (
+                  <p className="mt-2 text-sm font-medium text-emerald-700">
+                    Subscription active. You have full access.
+                  </p>
+                )}
+                {userId && !trialLoading && isOnTrial && (
+                  <p className="mt-2 text-sm font-medium text-emerald-700">
+                    {trialInfo?.trialRemainingDays ?? 0} day(s) of free trial
+                    remaining.
+                  </p>
+                )}
+                {userId && !trialLoading && !isTrialStarted && (
+                  <p className="mt-2 text-sm font-medium text-gray-700">
+                    Trial not started yet. Click the button to begin.
+                  </p>
+                )}
+                {userId && !trialLoading && isTrialExpired && (
+                  <p className="mt-2 text-sm font-semibold text-rose-700">
+                    {trialInfo?.message ||
+                      "Your 7-day free trial has ended. Please subscribe to continue."}
+                  </p>
+                )}
+              </div>
+
+              <button
+                onClick={handleTrialAction}
+                disabled={
+                  startTrialMutation.isPending ||
+                  trialLoading ||
+                  (Boolean(userId) && isTrialExpired)
+                }
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-3 font-semibold text-white shadow-lg transition hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {(startTrialMutation.isPending || trialLoading) && (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                )}
+                {!userId
+                  ? "Sign In to Start Trial"
+                  : isSubscribed || isOnTrial
+                  ? "Go to Meal Plan"
+                  : isTrialExpired
+                  ? "Trial Ended"
+                  : "Start 7-Day Free Trial"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Pricing Cards */}
-      <div className="relative mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
+      <div className="relative mx-auto max-w-[1600px] px-6 pb-24 sm:px-10 lg:px-16 2xl:px-20">
         <div className="grid gap-8 lg:grid-cols-3">
           {availablePlans.map((plan, key) => {
             const isPopular = plan.isPopular;
@@ -336,7 +527,7 @@ export default function SubscribePage() {
         </div>
 
         {/* Trust Badges */}
-        <div className="mx-auto mt-16 max-w-3xl">
+        <div className="mx-auto mt-20 max-w-5xl">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             {[
               { icon: Shield, text: "Secure Payment" },
@@ -359,8 +550,8 @@ export default function SubscribePage() {
       </div>
 
       {/* Testimonials */}
-      <div className="bg-white py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="bg-[#f3faf7] py-24">
+        <div className="mx-auto max-w-[1600px] px-6 sm:px-10 lg:px-16 2xl:px-20">
           <div className="text-center">
             <div className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-emerald-600">
               <Users className="h-4 w-4" />
@@ -399,8 +590,8 @@ export default function SubscribePage() {
       </div>
 
       {/* FAQ Section */}
-      <div className="bg-gray-50 py-20">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+      <div className="bg-[#eef7f3] py-24">
+        <div className="mx-auto max-w-5xl px-6 sm:px-10 lg:px-16">
           <div className="text-center">
             <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">
               Frequently asked questions
@@ -419,8 +610,8 @@ export default function SubscribePage() {
       </div>
 
       {/* Final CTA */}
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 py-16">
-        <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 py-20">
+        <div className="mx-auto max-w-6xl px-6 text-center sm:px-10 lg:px-16">
           <h2 className="text-3xl font-bold text-white sm:text-4xl">
             Ready to transform your meal planning?
           </h2>

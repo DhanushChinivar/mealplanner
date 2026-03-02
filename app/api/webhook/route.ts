@@ -46,20 +46,30 @@ export async function POST(request: NextRequest) {
 
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.clerkUserId;
+  const customerEmail = session.customer_details?.email ?? session.customer_email ?? "";
 
   if (!userId) {
     console.log("No Clerk User ID found in session metadata.");
+    return;
   }
 
   const subscriptionId = session.subscription as string;
   if (!subscriptionId) {
     console.log("No subscription ID found in session.");
+    return;
   }
 
   try {
-    await prisma.profile.update({
+    await prisma.profile.upsert({
       where: { userId },
-      data: {
+      update: {
+        stripeSubscriptionId: subscriptionId,
+        subscriptionActive: true,
+        subscriptionTier: session.metadata?.planType || null,
+      },
+      create: {
+        userId,
+        email: customerEmail,
         stripeSubscriptionId: subscriptionId,
         subscriptionActive: true,
         subscriptionTier: session.metadata?.planType || null,

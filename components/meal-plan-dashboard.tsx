@@ -2,8 +2,10 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState, useEffect, type ElementType, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useUser } from "@clerk/nextjs";
 import {
   Utensils,
   Flame,
@@ -52,6 +54,68 @@ interface WeeklyMealPlan {
 interface MealPlanResponse {
   mealPlan?: WeeklyMealPlan;
   error?: string;
+  source?: "provider" | "fallback" | "none";
+  warning?: string;
+  createdAt?: string;
+}
+
+type MealStatus = "completed" | "skipped";
+type MealTypeKey = "breakfast" | "lunch" | "dinner" | "snacks";
+
+interface MealLogResponse {
+  statuses?: {
+    [dayName: string]: {
+      breakfast?: MealStatus;
+      lunch?: MealStatus;
+      dinner?: MealStatus;
+      snacks?: MealStatus;
+    };
+  };
+  summary?: {
+    totalMeals: number;
+    completedMeals: number;
+    skippedMeals: number;
+    adherence: number;
+  };
+  error?: string;
+}
+
+interface MealAnalyticsResponse {
+  summary?: {
+    overallAdherence: number;
+    completedMeals: number;
+    skippedMeals: number;
+    totalMeals: number;
+    calorieTargetHitRate: number;
+    proteinConsistency: number;
+    currentDayStreak: number;
+  };
+  days?: Array<{
+    dayName: string;
+    completionRate: number;
+    completedMeals: number;
+    totalMeals: number;
+    plannedCalories: number;
+    plannedProtein: number;
+  }>;
+  heatmap?: Array<{
+    dayName: string;
+    breakfast: "completed" | "skipped" | "pending";
+    lunch: "completed" | "skipped" | "pending";
+    dinner: "completed" | "skipped" | "pending";
+    snacks: "completed" | "skipped" | "pending";
+  }>;
+  warning?: string;
+  error?: string;
+}
+
+interface TrialStatusResponse {
+  subscriptionActive?: boolean;
+  hasAccess?: boolean;
+  onTrial?: boolean;
+  trialRemainingDays?: number;
+  trialExpired?: boolean;
+  message?: string;
 }
 
 interface MealPlanInput {
@@ -163,13 +227,17 @@ const MealCard = ({
   meal, 
   icon: Icon, 
   gradient,
-  onRegenerate 
+  onRegenerate,
+  mealStatus,
+  onSetStatus,
 }: { 
   type: string; 
   meal?: string; 
   icon: ElementType; 
   gradient: string;
   onRegenerate?: () => void;
+  mealStatus?: "completed" | "skipped";
+  onSetStatus?: (status: "completed" | "skipped" | "pending") => void;
 }) => {
   const estimatedCalories = meal ? Math.floor(300 + Math.random() * 400) : 0;
   const prepTime = meal ? Math.floor(15 + Math.random() * 30) : 0;
@@ -186,15 +254,47 @@ const MealCard = ({
             </div>
             <h4 className="font-semibold text-gray-800 text-lg">{type}</h4>
           </div>
-          {meal && onRegenerate && (
-            <button 
-              onClick={onRegenerate}
-              className="opacity-0 group-hover:opacity-100 p-2 hover:bg-gray-100 rounded-lg transition-all duration-300"
-              title="Regenerate this meal"
-            >
-              <RefreshCw className="w-5 h-5 text-gray-400 hover:text-emerald-500" />
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {meal && onSetStatus && (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onSetStatus(mealStatus === "completed" ? "pending" : "completed")
+                  }
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    mealStatus === "completed"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {mealStatus === "completed" ? "Completed" : "Mark done"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onSetStatus(mealStatus === "skipped" ? "pending" : "skipped")
+                  }
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    mealStatus === "skipped"
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {mealStatus === "skipped" ? "Skipped" : "Skip"}
+                </button>
+              </>
+            )}
+            {meal && onRegenerate && (
+              <button 
+                onClick={onRegenerate}
+                className="opacity-0 group-hover:opacity-100 p-2 hover:bg-gray-100 rounded-lg transition-all duration-300"
+                title="Regenerate this meal"
+              >
+                <RefreshCw className="w-5 h-5 text-gray-400 hover:text-emerald-500" />
+              </button>
+            )}
+          </div>
         </div>
         
         {meal ? (
@@ -273,13 +373,25 @@ const DayCard = ({
   mealPlan, 
   isToday, 
   isExpanded, 
-  onToggle 
+  onToggle,
+  mealStatuses,
+  onSetMealStatus,
 }: { 
   day: string; 
   mealPlan?: DailyMealPlan; 
   isToday: boolean;
   isExpanded: boolean;
   onToggle: () => void;
+  mealStatuses?: {
+    breakfast?: MealStatus;
+    lunch?: MealStatus;
+    dinner?: MealStatus;
+    snacks?: MealStatus;
+  };
+  onSetMealStatus?: (
+    mealType: MealTypeKey,
+    status: "completed" | "skipped" | "pending"
+  ) => void;
 }) => (
   <div 
     className={`bg-white/80 backdrop-blur-sm rounded-2xl overflow-hidden transition-all duration-300 border ${
@@ -311,11 +423,55 @@ const DayCard = ({
     
     {isExpanded && mealPlan && (
       <div className="px-5 pb-5 grid gap-4 animate-in slide-in-from-top-2 duration-300">
-        <MealCard type="Breakfast" meal={mealPlan.breakfast} icon={Coffee} gradient="bg-gradient-to-br from-amber-400 to-orange-500" />
-        <MealCard type="Lunch" meal={mealPlan.lunch} icon={Sun} gradient="bg-gradient-to-br from-emerald-400 to-teal-500" />
-        <MealCard type="Dinner" meal={mealPlan.dinner} icon={Moon} gradient="bg-gradient-to-br from-indigo-400 to-purple-500" />
+        <MealCard
+          type="Breakfast"
+          meal={mealPlan.breakfast}
+          icon={Coffee}
+          gradient="bg-gradient-to-br from-amber-400 to-orange-500"
+          mealStatus={mealStatuses?.breakfast}
+          onSetStatus={
+            onSetMealStatus
+              ? (status) => onSetMealStatus("breakfast", status)
+              : undefined
+          }
+        />
+        <MealCard
+          type="Lunch"
+          meal={mealPlan.lunch}
+          icon={Sun}
+          gradient="bg-gradient-to-br from-emerald-400 to-teal-500"
+          mealStatus={mealStatuses?.lunch}
+          onSetStatus={
+            onSetMealStatus
+              ? (status) => onSetMealStatus("lunch", status)
+              : undefined
+          }
+        />
+        <MealCard
+          type="Dinner"
+          meal={mealPlan.dinner}
+          icon={Moon}
+          gradient="bg-gradient-to-br from-indigo-400 to-purple-500"
+          mealStatus={mealStatuses?.dinner}
+          onSetStatus={
+            onSetMealStatus
+              ? (status) => onSetMealStatus("dinner", status)
+              : undefined
+          }
+        />
         {mealPlan.snacks && (
-          <MealCard type="Snacks" meal={mealPlan.snacks} icon={Cookie} gradient="bg-gradient-to-br from-pink-400 to-rose-500" />
+          <MealCard
+            type="Snacks"
+            meal={mealPlan.snacks}
+            icon={Cookie}
+            gradient="bg-gradient-to-br from-pink-400 to-rose-500"
+            mealStatus={mealStatuses?.snacks}
+            onSetStatus={
+              onSetMealStatus
+                ? (status) => onSetMealStatus("snacks", status)
+                : undefined
+            }
+          />
         )}
       </div>
     )}
@@ -323,6 +479,7 @@ const DayCard = ({
 );
 
 export default function MealPlanDashboard() {
+  const { user } = useUser();
   const [dietType, setDietType] = useState("");
   const [calories, setCalories] = useState<number>(2000);
   const [allergies, setAllergies] = useState("");
@@ -334,6 +491,132 @@ export default function MealPlanDashboard() {
   const [isVegetarian, setIsVegetarian] = useState(false);
   const [isHighProtein, setIsHighProtein] = useState(false);
   const [isLowCarb, setIsLowCarb] = useState(false);
+  const [initialPlan, setInitialPlan] = useState<MealPlanResponse | null>(null);
+  const [isLoadingInitialPlan, setIsLoadingInitialPlan] = useState(true);
+  const [mealStatuses, setMealStatuses] = useState<
+    NonNullable<MealLogResponse["statuses"]>
+  >({});
+  const [adherenceSummary, setAdherenceSummary] = useState<
+    NonNullable<MealLogResponse["summary"]>
+  >({
+    totalMeals: 0,
+    completedMeals: 0,
+    skippedMeals: 0,
+    adherence: 0,
+  });
+  const [analyticsSummary, setAnalyticsSummary] = useState<
+    NonNullable<MealAnalyticsResponse["summary"]>
+  >({
+    overallAdherence: 0,
+    completedMeals: 0,
+    skippedMeals: 0,
+    totalMeals: 0,
+    calorieTargetHitRate: 0,
+    proteinConsistency: 0,
+    currentDayStreak: 0,
+  });
+  const [analyticsHeatmap, setAnalyticsHeatmap] = useState<
+    NonNullable<MealAnalyticsResponse["heatmap"]>
+  >([]);
+  const [trialRemainingDays, setTrialRemainingDays] = useState<number | null>(null);
+  const [isOnTrial, setIsOnTrial] = useState(false);
+  const [trialMessage, setTrialMessage] = useState<string | null>(null);
+
+  const fetchTrialStatus = async () => {
+    if (!user?.id) return;
+    try {
+      const response = await fetch(
+        `/api/check-subscription?userId=${encodeURIComponent(user.id)}`,
+        { method: "GET" }
+      );
+      if (!response.ok) return;
+      const data: TrialStatusResponse = await response.json();
+      setIsOnTrial(Boolean(data.onTrial));
+      setTrialRemainingDays(
+        typeof data.trialRemainingDays === "number" ? data.trialRemainingDays : null
+      );
+      setTrialMessage(data.message ?? null);
+    } catch (error) {
+      console.error("Failed to fetch trial status:", error);
+    }
+  };
+
+  const fetchMealAnalytics = async () => {
+    try {
+      const response = await fetch("/api/meal-analytics", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) return;
+      const data: MealAnalyticsResponse = await response.json();
+      setAnalyticsSummary(
+        data.summary ?? {
+          overallAdherence: 0,
+          completedMeals: 0,
+          skippedMeals: 0,
+          totalMeals: 0,
+          calorieTargetHitRate: 0,
+          proteinConsistency: 0,
+          currentDayStreak: 0,
+        }
+      );
+      setAnalyticsHeatmap(data.heatmap ?? []);
+    } catch (error) {
+      console.error("Failed to fetch meal analytics:", error);
+    }
+  };
+
+  const fetchMealLogs = async () => {
+    try {
+      const response = await fetch("/api/meal-log", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) return;
+      const data: MealLogResponse = await response.json();
+      setMealStatuses(data.statuses ?? {});
+      setAdherenceSummary(
+        data.summary ?? {
+          totalMeals: 0,
+          completedMeals: 0,
+          skippedMeals: 0,
+          adherence: 0,
+        }
+      );
+    } catch (error) {
+      console.error("Failed to fetch meal logs:", error);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchLatestPlan = async () => {
+      try {
+        const response = await fetch("/api/generate-mealplan", {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (!response.ok) return;
+        const data: MealPlanResponse = await response.json();
+        if (!isMounted) return;
+        if (data?.mealPlan) {
+          setInitialPlan(data);
+        }
+      } catch (error) {
+        console.error("Failed to load latest meal plan:", error);
+      } finally {
+        if (isMounted) setIsLoadingInitialPlan(false);
+      }
+    };
+
+    fetchLatestPlan();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const mutation = useMutation<MealPlanResponse, Error, MealPlanInput>({
     mutationFn: async (payload: MealPlanInput) => {
@@ -349,6 +632,10 @@ export default function MealPlanDashboard() {
       }
 
       return response.json();
+    },
+    onSuccess: async () => {
+      await fetchMealLogs();
+      await fetchMealAnalytics();
     },
   });
 
@@ -375,6 +662,20 @@ export default function MealPlanDashboard() {
 
   const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const today = daysOfWeek[new Date().getDay()];
+  const activePlanData = mutation.data ?? initialPlan;
+  const hasMealPlan = Boolean(activePlanData?.mealPlan);
+
+  useEffect(() => {
+    if (!hasMealPlan) return;
+    fetchMealLogs();
+    fetchMealAnalytics();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMealPlan]);
+
+  useEffect(() => {
+    fetchTrialStatus();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const normalizeMeals = (plan?: DailyMealPlan): DailyMealPlan | undefined => {
     if (!plan) return undefined;
@@ -388,8 +689,40 @@ export default function MealPlanDashboard() {
   };
 
   const getMealPlanForDay = (day: string): DailyMealPlan | undefined => {
-    if (!mutation.data?.mealPlan) return undefined;
-    return normalizeMeals(mutation.data.mealPlan[day]);
+    if (!activePlanData?.mealPlan) return undefined;
+    return normalizeMeals(activePlanData.mealPlan[day]);
+  };
+
+  const handleSetMealStatus = async (
+    dayName: string,
+    mealType: MealTypeKey,
+    status: "completed" | "skipped" | "pending"
+  ) => {
+    try {
+      const response = await fetch("/api/meal-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dayName,
+          mealType,
+          status,
+        }),
+      });
+      if (!response.ok) return;
+      const data: MealLogResponse = await response.json();
+      setMealStatuses(data.statuses ?? {});
+      setAdherenceSummary(
+        data.summary ?? {
+          totalMeals: 0,
+          completedMeals: 0,
+          skippedMeals: 0,
+          adherence: 0,
+        }
+      );
+      await fetchMealAnalytics();
+    } catch (error) {
+      console.error("Failed to update meal status:", error);
+    }
   };
 
   const todaysMealPlan = getMealPlanForDay(today);
@@ -397,8 +730,29 @@ export default function MealPlanDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 pt-20">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+        {isOnTrial && (
+          <div className="mb-6 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-5 py-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm sm:text-base font-semibold text-emerald-800">
+                  Free Trial Active: {trialRemainingDays ?? 0} day
+                  {(trialRemainingDays ?? 0) === 1 ? "" : "s"} remaining.
+                </p>
+                <p className="text-sm text-emerald-700 mt-1">
+                  {trialMessage || "After 7 days, subscribe to keep full access."}
+                </p>
+              </div>
+              <Link
+                href="/subscribe"
+                className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+              >
+                Upgrade Plan
+              </Link>
+            </div>
+          </div>
+        )}
         {/* View Mode Toggle - Only show when meal plan exists */}
-        {mutation.isSuccess && (
+        {hasMealPlan && (
           <div className="flex justify-end mb-6">
             <div className="flex items-center gap-2 bg-white/80 rounded-xl p-1 shadow-sm">
               <button
@@ -457,6 +811,16 @@ export default function MealPlanDashboard() {
                     <p className="font-bold text-xl text-green-600">25%</p>
                   </div>
                 </div>
+                {hasMealPlan && (
+                  <div className="rounded-2xl p-4 bg-emerald-50 border border-emerald-100">
+                    <p className="text-sm font-medium text-emerald-700">
+                      Adherence: {adherenceSummary.adherence}%
+                    </p>
+                    <p className="text-xs text-emerald-600 mt-1">
+                      {adherenceSummary.completedMeals} of {adherenceSummary.totalMeals} meals completed
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -584,12 +948,17 @@ export default function MealPlanDashboard() {
 
           {/* Main Content - Meal Plan */}
           <section className="lg:col-span-7">
-            {mutation.isPending ? (
+            {mutation.isPending || isLoadingInitialPlan ? (
               <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl shadow-gray-200/50 border border-white/50">
                 <AILoadingAnimation />
               </div>
-            ) : mutation.isSuccess && mutation.data.mealPlan ? (
+            ) : hasMealPlan ? (
               <div className="space-y-8">
+                {activePlanData?.warning && (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">
+                    {activePlanData.warning}
+                  </div>
+                )}
                 {/* Today's Highlight */}
                 {todaysMealPlan && viewMode === "weekly" && (
                   <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-3xl p-8 text-white shadow-xl shadow-emerald-500/30">
@@ -659,29 +1028,78 @@ export default function MealPlanDashboard() {
                         isToday={day === today}
                         isExpanded={expandedDay === day}
                         onToggle={() => setExpandedDay(expandedDay === day ? null : day)}
+                        mealStatuses={mealStatuses[day]}
+                        onSetMealStatus={(mealType, status) =>
+                          handleSetMealStatus(day, mealType, status)
+                        }
                       />
                     ))}
                   </div>
                 </div>
 
-                {/* Nutrition Insight */}
-                <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-6 border border-amber-200/50">
+                {/* Weekly Analytics */}
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-6 border border-amber-200/50 space-y-5">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-amber-100 rounded-xl">
                       <TrendingUp className="w-6 h-6 text-amber-600" />
                     </div>
-                    <div>
-                      <h3 className="font-bold text-lg text-amber-800">Weekly Nutrition Insight</h3>
-                      <p className="text-base text-amber-700">
-                        {isHighProtein 
-                          ? "High protein focus achieved! Great for muscle building and recovery."
-                          : isLowCarb
-                          ? "Low carb plan optimized for steady energy levels."
-                          : isVegetarian
-                          ? "Plant-based nutrition with complete protein sources."
-                          : "Balanced nutrition plan with optimal macro distribution."
-                        }
-                      </p>
+                    <h3 className="font-bold text-lg text-amber-800">Weekly Analytics</h3>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="rounded-xl bg-white/80 border border-amber-100 p-3">
+                      <p className="text-xs text-gray-500">Adherence</p>
+                      <p className="text-xl font-bold text-amber-700">{analyticsSummary.overallAdherence}%</p>
+                    </div>
+                    <div className="rounded-xl bg-white/80 border border-amber-100 p-3">
+                      <p className="text-xs text-gray-500">Calorie Target Hit</p>
+                      <p className="text-xl font-bold text-amber-700">{analyticsSummary.calorieTargetHitRate}%</p>
+                    </div>
+                    <div className="rounded-xl bg-white/80 border border-amber-100 p-3">
+                      <p className="text-xs text-gray-500">Protein Consistency</p>
+                      <p className="text-xl font-bold text-amber-700">{analyticsSummary.proteinConsistency}%</p>
+                    </div>
+                    <div className="rounded-xl bg-white/80 border border-amber-100 p-3">
+                      <p className="text-xs text-gray-500">Current Streak</p>
+                      <p className="text-xl font-bold text-amber-700">{analyticsSummary.currentDayStreak} days</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-semibold text-amber-800 mb-2">Completion Heatmap</p>
+                    <div className="space-y-2">
+                      {analyticsHeatmap.length === 0 ? (
+                        <p className="text-sm text-amber-700">No analytics data yet.</p>
+                      ) : (
+                        analyticsHeatmap.map((day) => {
+                          const slots = [
+                            day.breakfast,
+                            day.lunch,
+                            day.dinner,
+                            day.snacks,
+                          ];
+                          return (
+                            <div key={day.dayName} className="flex items-center gap-3">
+                              <span className="w-24 text-sm text-amber-900">{day.dayName.slice(0, 3)}</span>
+                              <div className="flex gap-2">
+                                {slots.map((slot, index) => (
+                                  <span
+                                    key={`${day.dayName}-${index}`}
+                                    className={`w-5 h-5 rounded-md border ${
+                                      slot === "completed"
+                                        ? "bg-emerald-400 border-emerald-500"
+                                        : slot === "skipped"
+                                        ? "bg-amber-300 border-amber-400"
+                                        : "bg-gray-200 border-gray-300"
+                                    }`}
+                                    title={slot}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                   </div>
                 </div>

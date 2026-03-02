@@ -7,9 +7,12 @@ const isPublicRoute = createRouteMatcher([
   "/",
   "/sign-up(.*)",
   "/subscribe(.*)",
+  "/subscribe/success(.*)",
   "/api/checkout(.*)",
   "/api/stripe-webhook(.*)",
   "/api/check-subscription(.*)",
+  "/api/start-trial(.*)",
+  "/api/sync-subscription(.*)",
   "/api/webhook(.*)",
 ]);
 
@@ -62,7 +65,7 @@ export default clerkMiddleware(async (auth, req) => {
       // Then parse JSON
       if (checkSubRes.ok) {
         const data = await checkSubRes.json();
-        if (!data.subscriptionActive) {
+        if (!data.hasAccess) {
           return NextResponse.redirect(new URL("/subscribe", origin));
         }
       } else {

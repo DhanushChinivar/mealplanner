@@ -2,6 +2,9 @@
 
 import { NextResponse } from "next/server";
 import { OpenAI } from "openai";
+import { currentUser } from "@clerk/nextjs/server";
+import { prisma } from "@/lib/prisma";
+import { parseMealToStructured } from "@/types/mealplan";
 
 const API_KEY = process.env.OPENROUTER_API_KEY ?? process.env.OPENAI_API_KEY;
 
@@ -59,6 +62,21 @@ const DAYS = [
   "Saturday",
   "Sunday",
 ] as const;
+const DAY_ORDER: Record<string, number> = {
+  Sunday: 0,
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+};
+const MEAL_ORDER: Record<string, number> = {
+  breakfast: 0,
+  lunch: 1,
+  dinner: 2,
+  snacks: 3,
+};
 
 const FALLBACK_MEALS = {
   Breakfast: [
@@ -167,16 +185,219 @@ function buildFallbackMealPlan({
   return plan;
 }
 
+function normalizeDayMealPlan(plan?: DailyMealPlan & {
+  breakfast?: string;
+  lunch?: string;
+  dinner?: string;
+  snacks?: string;
+}): {
+  breakfast?: string;
+  lunch?: string;
+  dinner?: string;
+  snacks?: string;
+} {
+  if (!plan) return {};
+  return {
+    breakfast: plan.Breakfast ?? plan.breakfast,
+    lunch: plan.Lunch ?? plan.lunch,
+    dinner: plan.Dinner ?? plan.dinner,
+    snacks: plan.Snacks ?? plan.snacks,
+  };
+}
+
+function normalizeWeeklyMealPlanForDb(weeklyPlan: {
+  [day: string]: DailyMealPlan;
+}) {
+  return Object.entries(weeklyPlan)
+    .map(([dayName, dayPlan]) => {
+      const normalized = normalizeDayMealPlan(dayPlan);
+      const items = Object.entries(normalized)
+        .filter(([, description]) => Boolean(description))
+        .map(([mealType, description]) => ({
+          mealType,
+          description: String(description),
+          sortOrder: MEAL_ORDER[mealType] ?? 99,
+        }))
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map(({ mealType, description }, mealIndex) => {
+          const normalizedMealType = mealType.toLowerCase();
+          const parseType =
+            normalizedMealType === "snacks" ? "snack" : normalizedMealType;
+          const structuredMeal = parseMealToStructured(
+            description,
+            parseType as "breakfast" | "lunch" | "dinner" | "snack",
+            DAY_ORDER[dayName] ?? 99,
+            mealIndex
+          );
+
+          return {
+            mealType,
+            sortOrder: MEAL_ORDER[mealType] ?? 99,
+            name: structuredMeal.name,
+            description,
+            calories: structuredMeal.macros.calories,
+            protein: structuredMeal.macros.protein,
+            carbs: structuredMeal.macros.carbs,
+            fats: structuredMeal.macros.fats,
+            fiber: structuredMeal.macros.fiber ?? null,
+            prepTime: structuredMeal.prepTime ?? null,
+            selected: structuredMeal.selected !== false,
+            portionMultiplier: structuredMeal.portionMultiplier ?? 1,
+            ingredients: structuredMeal.ingredients,
+          };
+        });
+
+      return {
+        dayName,
+        dayOrder: DAY_ORDER[dayName] ?? 99,
+        items,
+      };
+    })
+    .sort((a, b) => a.dayOrder - b.dayOrder);
+}
+
+function buildWeeklyMealPlanFromDb(days: Array<{
+  dayName: string;
+  items: Array<{ mealType: string; description: string }>;
+}>): { [day: string]: DailyMealPlan } {
+  const mealPlan: { [day: string]: DailyMealPlan } = {};
+
+  for (const day of days) {
+    const daily: DailyMealPlan = {};
+    for (const item of day.items) {
+      const key = item.mealType.toLowerCase();
+      if (key === "breakfast") daily.Breakfast = item.description;
+      if (key === "lunch") daily.Lunch = item.description;
+      if (key === "dinner") daily.Dinner = item.description;
+      if (key === "snacks" || key === "snack") daily.Snacks = item.description;
+    }
+    mealPlan[day.dayName] = daily;
+  }
+
+  return mealPlan;
+}
+
+async function persistMealPlan({
+  userId,
+  input,
+  mealPlan,
+  source,
+  warning,
+}: {
+  userId: string;
+  input: MealPlanRequest;
+  mealPlan: { [day: string]: DailyMealPlan };
+  source: "provider" | "fallback";
+  warning?: string;
+}) {
+  const days = normalizeWeeklyMealPlanForDb(mealPlan);
+  if (days.length === 0) return;
+
+  await prisma.mealPlan.create({
+    data: {
+      userId,
+      dietType: input.dietType ?? null,
+      calories: asCalories(input.calories),
+      allergies: input.allergies ?? null,
+      cuisine: input.cuisine ?? null,
+      snacks: Boolean(input.snacks),
+      source,
+      warning: warning ?? null,
+      days: {
+        create: days.map((day) => ({
+          dayName: day.dayName,
+          dayOrder: day.dayOrder,
+          items: {
+            create: day.items.map((item) => ({
+              mealType: item.mealType,
+              sortOrder: item.sortOrder,
+              name: item.name,
+              description: item.description,
+              calories: item.calories,
+              protein: item.protein,
+              carbs: item.carbs,
+              fats: item.fats,
+              fiber: item.fiber,
+              prepTime: item.prepTime,
+              selected: item.selected,
+              portionMultiplier: item.portionMultiplier,
+              ingredients: {
+                create: item.ingredients.map((ingredient) => ({
+                  name: ingredient.name,
+                  amount: ingredient.amount,
+                  unit: ingredient.unit,
+                  category: ingredient.category,
+                })),
+              },
+            })),
+          },
+        })),
+      },
+    },
+  });
+}
+
+async function safePersistMealPlan(
+  args: Parameters<typeof persistMealPlan>[0]
+): Promise<void> {
+  try {
+    await persistMealPlan(args);
+  } catch (error) {
+    console.error("Error persisting meal plan:", error);
+  }
+}
+
+export async function GET() {
+  try {
+    const clerkUser = await currentUser();
+    if (!clerkUser?.id) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+
+    const latest = await prisma.mealPlan.findFirst({
+      where: { userId: clerkUser.id },
+      orderBy: { createdAt: "desc" },
+      include: {
+        days: {
+          orderBy: { dayOrder: "asc" },
+          include: { items: { orderBy: { sortOrder: "asc" } } },
+        },
+      },
+    });
+
+    if (!latest) {
+      return NextResponse.json({ mealPlan: null, source: "none" });
+    }
+
+    return NextResponse.json({
+      mealPlan: buildWeeklyMealPlanFromDb(latest.days),
+      source: latest.source ?? "provider",
+      warning: latest.warning ?? undefined,
+      createdAt: latest.createdAt,
+    });
+  } catch (error) {
+    console.error("Error fetching latest meal plan:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch latest meal plan." },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: Request) {
   try {
+    const clerkUser = await currentUser();
+    const userId = clerkUser?.id;
+
     // Extract parameters from the request body
+    const input: MealPlanRequest = await request.json();
     const {
       dietType,
       calories,
       allergies,
       cuisine,
       snacks = false,
-    }: MealPlanRequest = await request.json();
+    } = input;
 
     const fallbackPlan = buildFallbackMealPlan({
       dietType,
@@ -187,6 +408,16 @@ export async function POST(request: Request) {
     });
 
     if (!API_KEY) {
+      if (userId) {
+        await safePersistMealPlan({
+          userId,
+          input,
+          mealPlan: fallbackPlan,
+          source: "fallback",
+          warning:
+            "Missing OpenRouter API key. Returned a locally generated meal plan.",
+        });
+      }
       return NextResponse.json({
         mealPlan: fallbackPlan,
         source: "fallback",
@@ -273,6 +504,15 @@ export async function POST(request: Request) {
     }
 
     if (!aiContent) {
+      if (userId) {
+        await safePersistMealPlan({
+          userId,
+          input,
+          mealPlan: fallbackPlan,
+          source: "fallback",
+          warning: `Provider request failed (${lastProviderStatus ?? "unknown"}): ${lastProviderMessage}`,
+        });
+      }
       return NextResponse.json(
         {
           mealPlan: fallbackPlan,
@@ -288,6 +528,16 @@ export async function POST(request: Request) {
       parsedMealPlan = JSON.parse(aiContent);
     } catch (parseError) {
       console.error("Error parsing AI response as JSON:", parseError);
+      if (userId) {
+        await safePersistMealPlan({
+          userId,
+          input,
+          mealPlan: fallbackPlan,
+          source: "fallback",
+          warning:
+            "Provider returned invalid JSON. Returned a locally generated meal plan.",
+        });
+      }
       return NextResponse.json(
         {
           mealPlan: fallbackPlan,
@@ -303,11 +553,30 @@ export async function POST(request: Request) {
       throw new Error("Invalid meal plan format received from AI.");
     }
 
+    if (userId) {
+      await safePersistMealPlan({
+        userId,
+        input,
+        mealPlan: parsedMealPlan,
+        source: "provider",
+      });
+    }
+
     return NextResponse.json({ mealPlan: parsedMealPlan, source: "provider" });
   } catch (error) {
     console.error("Error generating meal plan:", error);
     const { status, message } = getProviderErrorDetails(error);
     const fallbackPlan = buildFallbackMealPlan({});
+    const clerkUser = await currentUser();
+    if (clerkUser?.id) {
+      await safePersistMealPlan({
+        userId: clerkUser.id,
+        input: {},
+        mealPlan: fallbackPlan,
+        source: "fallback",
+        warning: `Unexpected error (${status ?? 500}): ${message}`,
+      });
+    }
     return NextResponse.json(
       {
         mealPlan: fallbackPlan,

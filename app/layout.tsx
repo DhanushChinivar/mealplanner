@@ -30,7 +30,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 text-gray-900`}
+          className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#f7fbf9] text-gray-900`}
         >
           <ReactQueryClientProvider>
             <LayoutFrame>{children}</LayoutFrame>

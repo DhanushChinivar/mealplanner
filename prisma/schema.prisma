@@ -19,3 +19,82 @@ model Profile {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }
+
+model MealPlan {
+  id        String    @id @default(uuid())
+  userId    String
+  dietType  String?
+  calories  Int?
+  allergies String?
+  cuisine   String?
+  snacks    Boolean   @default(false)
+  source    String?
+  warning   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  days      MealDay[]
+
+  @@index([userId, createdAt])
+}
+
+model MealDay {
+  id         String     @id @default(uuid())
+  mealPlanId String
+  dayName    String
+  dayOrder   Int
+  createdAt  DateTime   @default(now())
+  mealPlan   MealPlan   @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  items      MealItem[]
+
+  @@index([mealPlanId, dayOrder])
+}
+
+model MealItem {
+  id               String           @id @default(uuid())
+  mealDayId        String
+  mealType         String
+  sortOrder        Int              @default(0)
+  name             String
+  description      String
+  calories         Int?
+  protein          Int?
+  carbs            Int?
+  fats             Int?
+  fiber            Int?
+  prepTime         Int?
+  selected         Boolean          @default(true)
+  portionMultiplier Float           @default(1)
+  createdAt        DateTime         @default(now())
+  mealDay          MealDay          @relation(fields: [mealDayId], references: [id], onDelete: Cascade)
+  ingredients      MealIngredient[]
+  logs             MealLog[]
+
+  @@index([mealDayId])
+}
+
+model MealIngredient {
+  id         String   @id @default(uuid())
+  mealItemId String
+  name       String
+  amount     Float
+  unit       String
+  category   String
+  createdAt  DateTime @default(now())
+  mealItem   MealItem @relation(fields: [mealItemId], references: [id], onDelete: Cascade)
+
+  @@index([mealItemId])
+}
+
+model MealLog {
+  id         String   @id @default(uuid())
+  userId     String
+  mealPlanId String
+  mealItemId String
+  status     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  mealItem   MealItem @relation(fields: [mealItemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mealItemId])
+  @@index([userId, mealPlanId])
+}
