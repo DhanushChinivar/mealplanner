@@ -8,6 +8,7 @@ interface LogRequestBody {
   dayName?: string;
   mealType?: string;
   status?: MealStatus | "pending";
+  planId?: string;
 }
 
 interface StatusMap {
@@ -72,9 +73,9 @@ function buildStatusAndSummary(
   };
 }
 
-async function getLatestPlan(userId: string) {
+async function getPlanForUser(userId: string, planId?: string | null) {
   return prisma.mealPlan.findFirst({
-    where: { userId },
+    where: { userId, ...(planId ? { id: planId } : {}) },
     orderBy: { createdAt: "desc" },
     include: {
       days: {
@@ -90,14 +91,16 @@ async function getLatestPlan(userId: string) {
   });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const clerkUser = await currentUser();
     if (!clerkUser?.id) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
-    const latestPlan = await getLatestPlan(clerkUser.id);
+    const { searchParams } = new URL(request.url);
+    const planId = searchParams.get("planId");
+    const latestPlan = await getPlanForUser(clerkUser.id, planId);
     if (!latestPlan) {
       return NextResponse.json({
         statuses: {},
@@ -127,7 +130,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
-    const { dayName, mealType, status }: LogRequestBody = await request.json();
+    const { dayName, mealType, status, planId }: LogRequestBody =
+      await request.json();
     const normalizedDay = (dayName ?? "").trim();
     const normalizedMeal = normalizeMealType(mealType);
 
@@ -142,7 +146,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid status." }, { status: 400 });
     }
 
-    const latestPlan = await getLatestPlan(clerkUser.id);
+    const latestPlan = await getPlanForUser(clerkUser.id, planId);
     if (!latestPlan) {
       return NextResponse.json(
         { error: "No meal plan found for user." },

@@ -23,13 +23,13 @@ const carouselSlides = [
   },
   {
     image:
-      "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=1800&auto=format&fit=crop&q=80",
     title: "Family Dinners",
     subtitle: "Comfort food without the guesswork"
   },
   {
     image:
-      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1800&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1556911220-bff31c812dba?w=1800&auto=format&fit=crop&q=80",
     title: "Cooking With Kids",
     subtitle: "Fun meals everyone can help make"
   },

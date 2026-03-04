@@ -23,15 +23,18 @@ const DAY_NAMES = [
   "Saturday",
 ];
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const clerkUser = await currentUser();
     if (!clerkUser?.id) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const planId = searchParams.get("planId");
+
     const latestPlan = await prisma.mealPlan.findFirst({
-      where: { userId: clerkUser.id },
+      where: { userId: clerkUser.id, ...(planId ? { id: planId } : {}) },
       orderBy: { createdAt: "desc" },
       include: {
         days: {

@@ -71,15 +71,19 @@ function aggregateItems(
     });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const clerkUser = await currentUser();
     if (!clerkUser?.id) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const planId = searchParams.get("planId");
+    const servingsParam = Number.parseInt(searchParams.get("servings") ?? "", 10);
+
     const latestPlan = await prisma.mealPlan.findFirst({
-      where: { userId: clerkUser.id },
+      where: { userId: clerkUser.id, ...(planId ? { id: planId } : {}) },
       orderBy: { createdAt: "desc" },
       include: {
         days: {
@@ -98,12 +102,30 @@ export async function GET() {
       return NextResponse.json({ items: [], source: "none" });
     }
 
-    const items = aggregateItems(latestPlan.days);
+    const baseServings =
+      typeof latestPlan.servingCount === "number" && latestPlan.servingCount > 0
+        ? latestPlan.servingCount
+        : 1;
+    const targetServings = Number.isFinite(servingsParam)
+      ? Math.max(1, Math.min(8, servingsParam))
+      : baseServings;
+    const servingsRatio = targetServings / baseServings;
+
+    const scaledDays = latestPlan.days.map((day) => ({
+      ...day,
+      items: day.items.map((item) => ({
+        ...item,
+        portionMultiplier: (item.portionMultiplier ?? 1) * servingsRatio,
+      })),
+    }));
+
+    const items = aggregateItems(scaledDays);
     return NextResponse.json({
       items,
       source: latestPlan.source ?? "provider",
       warning: latestPlan.warning ?? undefined,
       createdAt: latestPlan.createdAt,
+      servingCount: targetServings,
     });
   } catch (error) {
     console.error("Error fetching grocery list:", error);

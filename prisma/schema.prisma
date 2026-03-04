@@ -23,6 +23,7 @@ model Profile {
 model MealPlan {
   id        String    @id @default(uuid())
   userId    String
+  servingCount Int    @default(1)
   dietType  String?
   calories  Int?
   allergies String?

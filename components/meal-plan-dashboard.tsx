@@ -3,9 +3,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useEffect, type ElementType, type FormEvent } from "react";
+import { useState, useEffect, useRef, type ElementType, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
+import GroceryList from "@/components/meal-plan/grocery-list";
+import type { GroceryItem } from "@/types/mealplan";
 import {
   Utensils,
   Flame,
@@ -34,6 +36,10 @@ import {
   Salad,
   Fish,
   Loader2,
+  ShoppingCart,
+  History,
+  LayoutPanelLeft,
+  Users,
 } from "lucide-react";
 
 interface DailyMealPlan {
@@ -57,6 +63,46 @@ interface MealPlanResponse {
   source?: "provider" | "fallback" | "none";
   warning?: string;
   createdAt?: string;
+  id?: string;
+  servingCount?: number;
+}
+
+interface MealPlanHistoryItem {
+  id: string;
+  createdAt: string;
+  source?: "provider" | "fallback";
+  warning?: string;
+  dietType?: string | null;
+  calories?: number | null;
+  servingCount?: number | null;
+}
+
+interface MealPlanHistoryResponse {
+  plans?: MealPlanHistoryItem[];
+  selected?: MealPlanResponse;
+  error?: string;
+}
+
+interface ProgressBucket {
+  plansGenerated: number;
+  totalMeals: number;
+  completedMeals: number;
+  skippedMeals: number;
+  avgAdherence: number;
+  calorieTargetHitRate: number;
+}
+
+interface MealProgressResponse {
+  monthly?: Record<string, ProgressBucket>;
+  yearly?: Record<string, ProgressBucket>;
+  totals?: { plansGenerated: number };
+  error?: string;
+}
+
+interface GroceryListResponse {
+  items?: GroceryItem[];
+  warning?: string;
+  error?: string;
 }
 
 type MealStatus = "completed" | "skipped";
@@ -125,6 +171,10 @@ interface MealPlanInput {
   cuisine: string;
   snacks: boolean;
   days?: number;
+  servingCount?: number;
+  swapDay?: string;
+  swapMealType?: MealTypeKey;
+  baseMealPlan?: WeeklyMealPlan;
 }
 
 // Larger SVG Pie Chart for Macros
@@ -149,7 +199,7 @@ const MacroPieChart = ({ protein = 30, carbs = 45, fats = 25 }: { protein?: numb
 
   return (
     <div className="relative">
-      <svg viewBox="-1 -1 2 2" className="w-44 h-44 transform -rotate-90">
+      <svg viewBox="-1 -1 2 2" className="w-52 h-52 transform -rotate-90">
         <path
           d={`M 0 0 L ${proteinX} ${proteinY} A 1 1 0 ${proteinAngle > 180 ? 1 : 0} 1 ${proteinEndX} ${proteinEndY} Z`}
           fill="#ef4444"
@@ -167,7 +217,7 @@ const MacroPieChart = ({ protein = 30, carbs = 45, fats = 25 }: { protein?: numb
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-20 h-20 bg-white rounded-full shadow-inner flex items-center justify-center">
+        <div className="w-24 h-24 bg-white rounded-full shadow-inner flex items-center justify-center">
           <Flame className="w-8 h-8 text-orange-500" />
         </div>
       </div>
@@ -376,6 +426,7 @@ const DayCard = ({
   onToggle,
   mealStatuses,
   onSetMealStatus,
+  onSwapMeal,
 }: { 
   day: string; 
   mealPlan?: DailyMealPlan; 
@@ -392,6 +443,7 @@ const DayCard = ({
     mealType: MealTypeKey,
     status: "completed" | "skipped" | "pending"
   ) => void;
+  onSwapMeal?: (mealType: MealTypeKey) => void;
 }) => (
   <div 
     className={`bg-white/80 backdrop-blur-sm rounded-2xl overflow-hidden transition-all duration-300 border ${
@@ -428,6 +480,7 @@ const DayCard = ({
           meal={mealPlan.breakfast}
           icon={Coffee}
           gradient="bg-gradient-to-br from-amber-400 to-orange-500"
+          onRegenerate={onSwapMeal ? () => onSwapMeal("breakfast") : undefined}
           mealStatus={mealStatuses?.breakfast}
           onSetStatus={
             onSetMealStatus
@@ -440,6 +493,7 @@ const DayCard = ({
           meal={mealPlan.lunch}
           icon={Sun}
           gradient="bg-gradient-to-br from-emerald-400 to-teal-500"
+          onRegenerate={onSwapMeal ? () => onSwapMeal("lunch") : undefined}
           mealStatus={mealStatuses?.lunch}
           onSetStatus={
             onSetMealStatus
@@ -452,6 +506,7 @@ const DayCard = ({
           meal={mealPlan.dinner}
           icon={Moon}
           gradient="bg-gradient-to-br from-indigo-400 to-purple-500"
+          onRegenerate={onSwapMeal ? () => onSwapMeal("dinner") : undefined}
           mealStatus={mealStatuses?.dinner}
           onSetStatus={
             onSetMealStatus
@@ -465,6 +520,7 @@ const DayCard = ({
             meal={mealPlan.snacks}
             icon={Cookie}
             gradient="bg-gradient-to-br from-pink-400 to-rose-500"
+            onRegenerate={onSwapMeal ? () => onSwapMeal("snacks") : undefined}
             mealStatus={mealStatuses?.snacks}
             onSetStatus={
               onSetMealStatus
@@ -480,18 +536,32 @@ const DayCard = ({
 
 export default function MealPlanDashboard() {
   const { user } = useUser();
+  const [activeTab, setActiveTab] = useState<"planner" | "history" | "grocery">(
+    "planner"
+  );
   const [dietType, setDietType] = useState("");
   const [calories, setCalories] = useState<number>(2000);
   const [allergies, setAllergies] = useState("");
   const [cuisine, setCuisine] = useState("");
   const [snacks, setSnacks] = useState(false);
+  const [servingCount, setServingCount] = useState<number>(1);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"daily" | "weekly">("weekly");
 
   const [isVegetarian, setIsVegetarian] = useState(false);
   const [isHighProtein, setIsHighProtein] = useState(false);
   const [isLowCarb, setIsLowCarb] = useState(false);
-  const [initialPlan, setInitialPlan] = useState<MealPlanResponse | null>(null);
+  const [selectedPlanData, setSelectedPlanData] = useState<MealPlanResponse | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [historyItems, setHistoryItems] = useState<MealPlanHistoryItem[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
+  const [groceryWarning, setGroceryWarning] = useState<string | null>(null);
+  const [isGroceryLoading, setIsGroceryLoading] = useState(false);
+  const [progressSummary, setProgressSummary] = useState<MealProgressResponse | null>(
+    null
+  );
+  const [isProgressLoading, setIsProgressLoading] = useState(false);
   const [isLoadingInitialPlan, setIsLoadingInitialPlan] = useState(true);
   const [mealStatuses, setMealStatuses] = useState<
     NonNullable<MealLogResponse["statuses"]>
@@ -521,6 +591,11 @@ export default function MealPlanDashboard() {
   const [trialRemainingDays, setTrialRemainingDays] = useState<number | null>(null);
   const [isOnTrial, setIsOnTrial] = useState(false);
   const [trialMessage, setTrialMessage] = useState<string | null>(null);
+  const [activePlannerSection, setActivePlannerSection] = useState<
+    "plan" | "analytics"
+  >("plan");
+  const weeklyPlanRef = useRef<HTMLDivElement | null>(null);
+  const weeklyAnalyticsRef = useRef<HTMLDivElement | null>(null);
 
   const fetchTrialStatus = async () => {
     if (!user?.id) return;
@@ -541,9 +616,13 @@ export default function MealPlanDashboard() {
     }
   };
 
-  const fetchMealAnalytics = async () => {
+  const fetchMealAnalytics = async (planId?: string) => {
     try {
-      const response = await fetch("/api/meal-analytics", {
+      const params = new URLSearchParams();
+      const finalPlanId = planId ?? selectedPlanId;
+      if (finalPlanId) params.set("planId", finalPlanId);
+      const query = params.toString();
+      const response = await fetch(`/api/meal-analytics${query ? `?${query}` : ""}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
@@ -566,9 +645,13 @@ export default function MealPlanDashboard() {
     }
   };
 
-  const fetchMealLogs = async () => {
+  const fetchMealLogs = async (planId?: string) => {
     try {
-      const response = await fetch("/api/meal-log", {
+      const params = new URLSearchParams();
+      const finalPlanId = planId ?? selectedPlanId;
+      if (finalPlanId) params.set("planId", finalPlanId);
+      const query = params.toString();
+      const response = await fetch(`/api/meal-log${query ? `?${query}` : ""}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
@@ -588,6 +671,85 @@ export default function MealPlanDashboard() {
     }
   };
 
+  const fetchMealHistory = async () => {
+    try {
+      setIsHistoryLoading(true);
+      const response = await fetch("/api/mealplans", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) return;
+      const data: MealPlanHistoryResponse = await response.json();
+      setHistoryItems(data.plans ?? []);
+    } catch (error) {
+      console.error("Failed to fetch meal plan history:", error);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  const loadHistoryPlan = async (planId: string) => {
+    try {
+      setIsHistoryLoading(true);
+      const response = await fetch(`/api/mealplans?planId=${encodeURIComponent(planId)}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) return;
+      const data: MealPlanHistoryResponse = await response.json();
+      if (data.selected) {
+        setSelectedPlanData(data.selected);
+        setSelectedPlanId(planId);
+        setServingCount(data.selected.servingCount ?? 1);
+        await fetchMealLogs(planId);
+        await fetchMealAnalytics(planId);
+      }
+      setHistoryItems(data.plans ?? []);
+    } catch (error) {
+      console.error("Failed to load selected meal plan:", error);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  const fetchGrocerySync = async () => {
+    try {
+      setIsGroceryLoading(true);
+      const params = new URLSearchParams();
+      if (selectedPlanId) params.set("planId", selectedPlanId);
+      params.set("servings", String(servingCount));
+      const response = await fetch(`/api/grocery-list?${params.toString()}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data: GroceryListResponse = await response.json();
+      if (!response.ok) return;
+      setGroceryItems(data.items ?? []);
+      setGroceryWarning(data.warning ?? null);
+    } catch (error) {
+      console.error("Failed to fetch grocery sync:", error);
+    } finally {
+      setIsGroceryLoading(false);
+    }
+  };
+
+  const fetchProgressSummary = async () => {
+    try {
+      setIsProgressLoading(true);
+      const response = await fetch("/api/meal-progress", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) return;
+      const data: MealProgressResponse = await response.json();
+      setProgressSummary(data);
+    } catch (error) {
+      console.error("Failed to fetch progress summary:", error);
+    } finally {
+      setIsProgressLoading(false);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -602,7 +764,9 @@ export default function MealPlanDashboard() {
         const data: MealPlanResponse = await response.json();
         if (!isMounted) return;
         if (data?.mealPlan) {
-          setInitialPlan(data);
+          setSelectedPlanData(data);
+          setSelectedPlanId(data.id ?? null);
+          setServingCount(data.servingCount ?? 1);
         }
       } catch (error) {
         console.error("Failed to load latest meal plan:", error);
@@ -633,9 +797,15 @@ export default function MealPlanDashboard() {
 
       return response.json();
     },
-    onSuccess: async () => {
-      await fetchMealLogs();
-      await fetchMealAnalytics();
+    onSuccess: async (data) => {
+      setSelectedPlanData(data ?? null);
+      setSelectedPlanId(data?.id ?? null);
+      if (typeof data?.servingCount === "number") {
+        setServingCount(data.servingCount);
+      }
+      await fetchMealLogs(data?.id ?? undefined);
+      await fetchMealAnalytics(data?.id ?? undefined);
+      await fetchMealHistory();
     },
   });
 
@@ -646,7 +816,8 @@ export default function MealPlanDashboard() {
     if (isVegetarian) dietTypes.push("Vegetarian");
     if (isHighProtein) dietTypes.push("High-Protein");
     if (isLowCarb) dietTypes.push("Low-Carb");
-    const finalDietType = dietTypes.length > 0 ? dietTypes.join(", ") : dietType || "Balanced";
+    const finalDietType =
+      dietTypes.length > 0 ? dietTypes.join(", ") : dietType || "Balanced";
 
     const payload: MealPlanInput = {
       dietType: finalDietType,
@@ -655,6 +826,7 @@ export default function MealPlanDashboard() {
       cuisine,
       snacks,
       days: 7,
+      servingCount,
     };
 
     mutation.mutate(payload);
@@ -662,20 +834,51 @@ export default function MealPlanDashboard() {
 
   const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const today = daysOfWeek[new Date().getDay()];
-  const activePlanData = mutation.data ?? initialPlan;
+  const activePlanData = selectedPlanData;
   const hasMealPlan = Boolean(activePlanData?.mealPlan);
 
   useEffect(() => {
     if (!hasMealPlan) return;
-    fetchMealLogs();
-    fetchMealAnalytics();
+    fetchMealLogs(selectedPlanId ?? undefined);
+    fetchMealAnalytics(selectedPlanId ?? undefined);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasMealPlan]);
+  }, [hasMealPlan, selectedPlanId]);
 
   useEffect(() => {
     fetchTrialStatus();
+    fetchMealHistory();
+    fetchProgressSummary();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  useEffect(() => {
+    if (activeTab !== "grocery") return;
+    fetchGrocerySync();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedPlanId, servingCount, hasMealPlan]);
+
+  useEffect(() => {
+    if (activeTab !== "planner") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible) return;
+        if (visible.target === weeklyPlanRef.current) {
+          setActivePlannerSection("plan");
+        }
+        if (visible.target === weeklyAnalyticsRef.current) {
+          setActivePlannerSection("analytics");
+        }
+      },
+      { threshold: [0.3, 0.5, 0.7] }
+    );
+
+    if (weeklyPlanRef.current) observer.observe(weeklyPlanRef.current);
+    if (weeklyAnalyticsRef.current) observer.observe(weeklyAnalyticsRef.current);
+    return () => observer.disconnect();
+  }, [activeTab, hasMealPlan]);
 
   const normalizeMeals = (plan?: DailyMealPlan): DailyMealPlan | undefined => {
     if (!plan) return undefined;
@@ -693,6 +896,14 @@ export default function MealPlanDashboard() {
     return normalizeMeals(activePlanData.mealPlan[day]);
   };
 
+  const getMealPlanForDayFromPlan = (
+    planData: MealPlanResponse | null,
+    day: string
+  ): DailyMealPlan | undefined => {
+    if (!planData?.mealPlan) return undefined;
+    return normalizeMeals(planData.mealPlan[day]);
+  };
+
   const handleSetMealStatus = async (
     dayName: string,
     mealType: MealTypeKey,
@@ -706,6 +917,7 @@ export default function MealPlanDashboard() {
           dayName,
           mealType,
           status,
+          planId: selectedPlanId,
         }),
       });
       if (!response.ok) return;
@@ -719,17 +931,62 @@ export default function MealPlanDashboard() {
           adherence: 0,
         }
       );
-      await fetchMealAnalytics();
+      await fetchMealAnalytics(selectedPlanId ?? undefined);
     } catch (error) {
       console.error("Failed to update meal status:", error);
     }
   };
 
+  const handleSwapMeal = (dayName: string, mealType: MealTypeKey) => {
+    if (!activePlanData?.mealPlan) return;
+
+    const dietTypes = [];
+    if (isVegetarian) dietTypes.push("Vegetarian");
+    if (isHighProtein) dietTypes.push("High-Protein");
+    if (isLowCarb) dietTypes.push("Low-Carb");
+    const finalDietType =
+      dietTypes.length > 0 ? dietTypes.join(", ") : dietType || "Balanced";
+
+    mutation.mutate({
+      dietType: finalDietType,
+      calories,
+      allergies,
+      cuisine,
+      snacks,
+      servingCount,
+      swapDay: dayName,
+      swapMealType: mealType,
+      baseMealPlan: activePlanData.mealPlan,
+      days: 7,
+    });
+  };
+
   const todaysMealPlan = getMealPlanForDay(today);
+  const selectedHistoryItem = historyItems.find((item) => item.id === selectedPlanId);
+  const scrollToPlannerSection = (section: "plan" | "analytics") => {
+    setActivePlannerSection(section);
+    if (activeTab !== "planner") {
+      setActiveTab("planner");
+      setTimeout(() => {
+        if (section === "plan") {
+          weeklyPlanRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          return;
+        }
+        weeklyAnalyticsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 120);
+      return;
+    }
+
+    if (section === "plan") {
+      weeklyPlanRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    weeklyAnalyticsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 pt-20">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-[#f9fffc] to-teal-50 pt-[104px]">
+      <main className="w-full px-5 sm:px-8 lg:px-12 2xl:px-16 py-10 sm:py-12">
         {isOnTrial && (
           <div className="mb-6 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-5 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -757,7 +1014,7 @@ export default function MealPlanDashboard() {
             <div className="flex items-center gap-2 bg-white/80 rounded-xl p-1 shadow-sm">
               <button
                 onClick={() => setViewMode("daily")}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
                   viewMode === "daily" ? "bg-emerald-100 text-emerald-700" : "text-gray-500 hover:bg-gray-100"
                 }`}
               >
@@ -765,7 +1022,7 @@ export default function MealPlanDashboard() {
               </button>
               <button
                 onClick={() => setViewMode("weekly")}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
                   viewMode === "weekly" ? "bg-emerald-100 text-emerald-700" : "text-gray-500 hover:bg-gray-100"
                 }`}
               >
@@ -775,11 +1032,103 @@ export default function MealPlanDashboard() {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-12 gap-10">
+        <div className="relative">
+          <aside className="mb-6 w-full xl:mb-0 xl:w-64 xl:fixed xl:left-6 2xl:left-10 xl:top-[145px] xl:z-30">
+            <div className="rounded-2xl border border-emerald-100 bg-white/90 p-3 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setActiveTab("planner")}
+                className={`mb-2 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
+                  activeTab === "planner"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                <LayoutPanelLeft className="h-4 w-4" />
+                Planner
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("history")}
+                className={`mb-2 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
+                  activeTab === "history"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                <History className="h-4 w-4" />
+                History
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("grocery")}
+                className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
+                  activeTab === "grocery"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                <ShoppingCart className="h-4 w-4" />
+                Grocery Sync
+              </button>
+              {activeTab === "planner" && (
+                <div className="mt-2 border-t border-emerald-100 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => scrollToPlannerSection("plan")}
+                    className={`mb-1 w-full rounded-lg px-3 py-2 text-left text-xs font-semibold transition ${
+                      activePlannerSection === "plan"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "text-emerald-700 hover:bg-emerald-50"
+                    }`}
+                  >
+                    &rarr; Weekly Meal Plan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => scrollToPlannerSection("analytics")}
+                    className={`w-full rounded-lg px-3 py-2 text-left text-xs font-semibold transition ${
+                      activePlannerSection === "analytics"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "text-emerald-700 hover:bg-emerald-50"
+                    }`}
+                  >
+                    &rarr; Weekly Analytics
+                  </button>
+                </div>
+              )}
+            </div>
+          </aside>
+
+          <div className="xl:ml-[19rem]">
+          <section className="mb-8 rounded-3xl border border-emerald-100 bg-white/75 backdrop-blur-sm px-6 py-6 sm:px-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.15em] text-emerald-600">
+                  Meal Planner Dashboard
+                </p>
+                <h1 className="mt-2 text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-gray-900">
+                  Plan Smarter. Eat Better.
+                </h1>
+                <p className="mt-2 text-base sm:text-lg text-gray-600 max-w-3xl">
+                  Build a weekly plan, track progress, and regenerate meals instantly.
+                </p>
+              </div>
+              {hasMealPlan && (
+                <div className="inline-flex items-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                  Active view: {viewMode === "weekly" ? "Weekly Plan" : "Daily Plan"}
+                </div>
+              )}
+            </div>
+          </section>
+
+          {activeTab === "planner" && (
+          <>
           {/* Left Sidebar - Controls */}
-          <aside className="lg:col-span-5 space-y-8">
-            {/* Quick Stats Card */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl shadow-gray-200/50 border border-white/50">
+          <aside className="w-full">
+            <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
+              {/* Quick Stats Card */}
+              <div className="w-full bg-white/85 backdrop-blur-sm rounded-3xl p-8 sm:p-10 shadow-xl shadow-gray-200/60 border border-white/60">
               <div className="flex items-center gap-4 mb-8">
                 <div className="p-3 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl">
                   <Target className="w-6 h-6 text-white" />
@@ -822,10 +1171,10 @@ export default function MealPlanDashboard() {
                   </div>
                 )}
               </div>
-            </div>
+              </div>
 
-            {/* Input Form Card */}
-            <form onSubmit={handleSubmit} className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl shadow-gray-200/50 border border-white/50 space-y-8">
+              {/* Preferences Card */}
+              <form onSubmit={handleSubmit} className="w-full bg-white/85 backdrop-blur-sm rounded-3xl p-8 sm:p-10 shadow-xl shadow-gray-200/60 border border-white/60 space-y-8">
               <div className="flex items-center gap-4 mb-4">
                 <div className="p-3 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl">
                   <Sparkles className="w-6 h-6 text-white" />
@@ -864,6 +1213,30 @@ export default function MealPlanDashboard() {
                 <div className="flex justify-between text-sm text-gray-400">
                   <span>1200</span>
                   <span>4000</span>
+                </div>
+              </div>
+
+              {/* Cuisine Input */}
+              <div className="space-y-3">
+                <label className="text-base font-medium text-gray-700 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-emerald-500" />
+                  Serving Count
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[1, 2, 4, 6].map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => setServingCount(count)}
+                      className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                        servingCount === count
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                          : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {count} {count === 1 ? "serving" : "servings"}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -943,13 +1316,14 @@ export default function MealPlanDashboard() {
                   <p className="text-base text-red-700">{mutation.error?.message || "An error occurred."}</p>
                 </div>
               )}
-            </form>
+              </form>
+            </div>
           </aside>
 
           {/* Main Content - Meal Plan */}
-          <section className="lg:col-span-7">
+          <section className="w-full">
             {mutation.isPending || isLoadingInitialPlan ? (
-              <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl shadow-gray-200/50 border border-white/50">
+              <div className="bg-white/85 backdrop-blur-sm rounded-3xl shadow-xl shadow-gray-200/60 border border-white/60 min-h-[520px]">
                 <AILoadingAnimation />
               </div>
             ) : hasMealPlan ? (
@@ -995,7 +1369,7 @@ export default function MealPlanDashboard() {
                 )}
 
                 {/* Weekly Overview */}
-                <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl shadow-gray-200/50 border border-white/50">
+                <div ref={weeklyPlanRef} className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl shadow-gray-200/50 border border-white/50">
                   <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-4">
                       <div className="p-3 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-xl">
@@ -1010,6 +1384,7 @@ export default function MealPlanDashboard() {
                         allergies,
                         cuisine,
                         snacks,
+                        servingCount,
                         days: 7,
                       })}
                       className="flex items-center gap-2 px-5 py-3 text-base font-medium text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
@@ -1032,13 +1407,14 @@ export default function MealPlanDashboard() {
                         onSetMealStatus={(mealType, status) =>
                           handleSetMealStatus(day, mealType, status)
                         }
+                        onSwapMeal={(mealType) => handleSwapMeal(day, mealType)}
                       />
                     ))}
                   </div>
                 </div>
 
                 {/* Weekly Analytics */}
-                <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-6 border border-amber-200/50 space-y-5">
+                <div ref={weeklyAnalyticsRef} className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-6 border border-amber-200/50 space-y-5">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-amber-100 rounded-xl">
                       <TrendingUp className="w-6 h-6 text-amber-600" />
@@ -1132,6 +1508,251 @@ export default function MealPlanDashboard() {
               </div>
             )}
           </section>
+          </>
+          )}
+
+          {activeTab === "history" && (
+            <section className="w-full rounded-3xl border border-emerald-100 bg-white/85 p-6 sm:p-8 shadow-sm">
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-900">Meal Plan History</h2>
+                <button
+                  type="button"
+                  onClick={fetchMealHistory}
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </button>
+              </div>
+              <div className="mb-6 grid gap-4 lg:grid-cols-2">
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                    Monthly Estimate
+                  </p>
+                  {isProgressLoading ? (
+                    <p className="mt-2 text-sm text-emerald-700">Calculating...</p>
+                  ) : (
+                    (() => {
+                      const latestMonth = Object.keys(progressSummary?.monthly ?? {})
+                        .sort()
+                        .pop();
+                      const bucket = latestMonth
+                        ? progressSummary?.monthly?.[latestMonth]
+                        : undefined;
+                      return (
+                        <div className="mt-2 space-y-1 text-sm text-emerald-800">
+                          <p>
+                            {latestMonth ?? "N/A"}: {bucket?.plansGenerated ?? 0} plans
+                          </p>
+                          <p>Avg adherence: {bucket?.avgAdherence ?? 0}%</p>
+                          <p>Calorie hit: {bucket?.calorieTargetHitRate ?? 0}%</p>
+                        </div>
+                      );
+                    })()
+                  )}
+                </div>
+                <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                    Yearly Estimate
+                  </p>
+                  {isProgressLoading ? (
+                    <p className="mt-2 text-sm text-amber-700">Calculating...</p>
+                  ) : (
+                    (() => {
+                      const latestYear = Object.keys(progressSummary?.yearly ?? {})
+                        .sort()
+                        .pop();
+                      const bucket = latestYear
+                        ? progressSummary?.yearly?.[latestYear]
+                        : undefined;
+                      return (
+                        <div className="mt-2 space-y-1 text-sm text-amber-800">
+                          <p>
+                            {latestYear ?? "N/A"}: {bucket?.plansGenerated ?? 0} plans
+                          </p>
+                          <p>Avg adherence: {bucket?.avgAdherence ?? 0}%</p>
+                          <p>Calorie hit: {bucket?.calorieTargetHitRate ?? 0}%</p>
+                        </div>
+                      );
+                    })()
+                  )}
+                </div>
+              </div>
+              <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
+                <div className="max-h-[72vh] overflow-y-auto pr-1">
+                  {isHistoryLoading ? (
+                    <p className="text-sm text-gray-500">Loading history...</p>
+                  ) : historyItems.length === 0 ? (
+                    <p className="text-sm text-gray-500">
+                      No history yet. Generate your first plan.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {historyItems.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => loadHistoryPlan(item.id)}
+                          className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                            selectedPlanId === item.id
+                              ? "border-emerald-400 bg-emerald-50"
+                              : "border-gray-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/40"
+                          }`}
+                        >
+                          <p className="text-sm font-semibold text-gray-900">
+                            {new Date(item.createdAt).toLocaleString()}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-600">
+                            {item.dietType || "Balanced"} • {item.calories ?? "N/A"} kcal •{" "}
+                            {item.servingCount ?? 1} serving(s) • {item.source ?? "provider"}
+                          </p>
+                          {item.warning && (
+                            <p className="mt-2 text-xs text-amber-700">{item.warning}</p>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-emerald-100 bg-white p-5 sm:p-6">
+                  {!selectedPlanData?.mealPlan ? (
+                    <p className="text-sm text-gray-500">
+                      Select a history entry to view full plan details.
+                    </p>
+                  ) : (
+                    <div className="space-y-5">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                            Selected Week
+                          </p>
+                          <p className="text-lg font-bold text-gray-900">
+                            {selectedHistoryItem?.createdAt
+                              ? new Date(selectedHistoryItem.createdAt).toLocaleString()
+                              : "Current Plan"}
+                          </p>
+                          <p className="mt-1 text-sm text-gray-600">
+                            Adherence {analyticsSummary.overallAdherence}% • Calorie hit{" "}
+                            {analyticsSummary.calorieTargetHitRate}% • Streak{" "}
+                            {analyticsSummary.currentDayStreak} day(s)
+                          </p>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {(selectedHistoryItem?.dietType || "Balanced")} •{" "}
+                            {selectedHistoryItem?.calories ?? "N/A"} kcal •{" "}
+                            {selectedHistoryItem?.servingCount ?? selectedPlanData.servingCount ?? 1} serving(s)
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("planner")}
+                          className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                        >
+                          Open In Planner
+                        </button>
+                      </div>
+
+                      <div className="max-h-[56vh] space-y-3 overflow-y-auto pr-1">
+                        {daysOfWeek.map((day) => {
+                          const plan = getMealPlanForDayFromPlan(selectedPlanData, day);
+                          return (
+                            <div
+                              key={`history-detail-${day}`}
+                              className="rounded-xl border border-gray-200 bg-gray-50/60 p-4"
+                            >
+                              <p className="text-sm font-bold text-gray-900">{day}</p>
+                              {!plan ? (
+                                <p className="mt-2 text-sm text-gray-500">
+                                  No meals available.
+                                </p>
+                              ) : (
+                                <div className="mt-2 grid gap-2 text-sm text-gray-700">
+                                  <p>
+                                    <span className="font-semibold">Breakfast:</span>{" "}
+                                    {plan.breakfast || "N/A"}
+                                  </p>
+                                  <p>
+                                    <span className="font-semibold">Lunch:</span>{" "}
+                                    {plan.lunch || "N/A"}
+                                  </p>
+                                  <p>
+                                    <span className="font-semibold">Dinner:</span>{" "}
+                                    {plan.dinner || "N/A"}
+                                  </p>
+                                  {plan.snacks && (
+                                    <p>
+                                      <span className="font-semibold">Snacks:</span>{" "}
+                                      {plan.snacks}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {activeTab === "grocery" && (
+            <section className="w-full rounded-3xl border border-emerald-100 bg-white/85 p-6 sm:p-8 shadow-sm space-y-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Quick Grocery Sync</h2>
+                  <p className="text-sm text-gray-600">
+                    Pull ingredients for the selected plan and serving size.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchGrocerySync}
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Sync Now
+                </button>
+              </div>
+
+              <div className="max-w-sm">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Servings Multiplier
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[1, 2, 4, 6].map((count) => (
+                    <button
+                      key={`grocery-serving-${count}`}
+                      type="button"
+                      onClick={() => setServingCount(count)}
+                      className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                        servingCount === count
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                          : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {count}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {groceryWarning && (
+                <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  {groceryWarning}
+                </p>
+              )}
+
+              {isGroceryLoading ? (
+                <p className="text-sm text-gray-500">Syncing grocery list...</p>
+              ) : (
+                <GroceryList items={groceryItems} />
+              )}
+            </section>
+          )}
+          </div>
         </div>
       </main>
     </div>

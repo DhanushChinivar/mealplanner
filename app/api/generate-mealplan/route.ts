@@ -22,7 +22,7 @@ function createOpenRouterClient(apiKey: string) {
 
 const MODELS = (
   process.env.OPENROUTER_MODELS ??
-  "meta-llama/llama-3.2-3b-instruct:free,mistralai/mistral-7b-instruct:free"
+  "meta-llama/llama-3.2-3b-instruct:free"
 )
   .split(",")
   .map((model) => model.trim())
@@ -43,6 +43,10 @@ interface DailyMealPlan {
   Lunch?: string;
   Dinner?: string;
   Snacks?: string;
+  breakfast?: string;
+  lunch?: string;
+  dinner?: string;
+  snacks?: string;
 }
 
 interface MealPlanRequest {
@@ -51,6 +55,10 @@ interface MealPlanRequest {
   allergies?: string;
   cuisine?: string;
   snacks?: boolean;
+  servingCount?: number;
+  swapDay?: string;
+  swapMealType?: string;
+  baseMealPlan?: { [day: string]: DailyMealPlan };
 }
 
 const DAYS = [
@@ -132,6 +140,20 @@ function shouldRetry(status: number | undefined): boolean {
   return status === 429 || status === 408 || status === 502 || status === 503;
 }
 
+function toUserWarning(status: number | undefined, message: string): string {
+  const msg = message.toLowerCase();
+  if (status === 404 && msg.includes("no endpoints found")) {
+    return "AI provider model is temporarily unavailable. A backup meal plan was generated.";
+  }
+  if (status === 429) {
+    return "AI provider is busy right now. A backup meal plan was generated.";
+  }
+  if (status && status >= 500) {
+    return "AI provider had a temporary issue. A backup meal plan was generated.";
+  }
+  return "AI provider is currently unavailable. A backup meal plan was generated.";
+}
+
 function asCalories(value: number | string | undefined): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -139,6 +161,17 @@ function asCalories(value: number | string | undefined): number {
     if (Number.isFinite(parsed)) return parsed;
   }
   return 2000;
+}
+
+function normalizeServingCount(value: number | undefined): number {
+  if (typeof value !== "number" || Number.isNaN(value)) return 1;
+  return Math.max(1, Math.min(8, Math.round(value)));
+}
+
+function normalizeMealTypeForSwap(value: string | undefined): string {
+  const normalized = (value ?? "").trim().toLowerCase();
+  if (normalized === "snack") return "snacks";
+  return normalized;
 }
 
 function buildFallbackMealPlan({
@@ -256,6 +289,90 @@ function normalizeWeeklyMealPlanForDb(weeklyPlan: {
     .sort((a, b) => a.dayOrder - b.dayOrder);
 }
 
+function applySwapToWeeklyPlan({
+  baseMealPlan,
+  candidateMealPlan,
+  swapDay,
+  swapMealType,
+}: {
+  baseMealPlan?: { [day: string]: DailyMealPlan };
+  candidateMealPlan: { [day: string]: DailyMealPlan };
+  swapDay?: string;
+  swapMealType?: string;
+}): { [day: string]: DailyMealPlan } {
+  if (!baseMealPlan || !swapDay || !swapMealType) return candidateMealPlan;
+
+  const dayKey = Object.keys(baseMealPlan).find(
+    (day) => day.toLowerCase() === swapDay.toLowerCase()
+  );
+  if (!dayKey) return candidateMealPlan;
+
+  const candidateDay = Object.keys(candidateMealPlan).find(
+    (day) => day.toLowerCase() === swapDay.toLowerCase()
+  );
+  if (!candidateDay) return candidateMealPlan;
+
+  const normalizedMeal = normalizeMealTypeForSwap(swapMealType);
+  if (!["breakfast", "lunch", "dinner", "snacks"].includes(normalizedMeal)) {
+    return candidateMealPlan;
+  }
+
+  const merged: { [day: string]: DailyMealPlan } = {};
+  for (const day of DAYS) {
+    const current = baseMealPlan[day] ?? {};
+    merged[day] = {
+      Breakfast: current.Breakfast ?? current.breakfast,
+      Lunch: current.Lunch ?? current.lunch,
+      Dinner: current.Dinner ?? current.dinner,
+      Snacks: current.Snacks ?? current.snacks,
+    };
+  }
+
+  const swapSourceDay = candidateMealPlan[candidateDay] ?? {};
+  const nextDay = merged[dayKey] ?? {};
+  if (normalizedMeal === "breakfast") {
+    nextDay.Breakfast = swapSourceDay.Breakfast ?? swapSourceDay.breakfast;
+  }
+  if (normalizedMeal === "lunch") {
+    nextDay.Lunch = swapSourceDay.Lunch ?? swapSourceDay.lunch;
+  }
+  if (normalizedMeal === "dinner") {
+    nextDay.Dinner = swapSourceDay.Dinner ?? swapSourceDay.dinner;
+  }
+  if (normalizedMeal === "snacks") {
+    nextDay.Snacks = swapSourceDay.Snacks ?? swapSourceDay.snacks;
+  }
+
+  merged[dayKey] = nextDay;
+  return merged;
+}
+
+function normalizeInputForCompare(input: MealPlanRequest) {
+  return {
+    dietType: (input.dietType ?? "").trim(),
+    calories: asCalories(input.calories),
+    allergies: (input.allergies ?? "").trim(),
+    cuisine: (input.cuisine ?? "").trim(),
+    snacks: Boolean(input.snacks),
+    servingCount: normalizeServingCount(input.servingCount),
+  };
+}
+
+function normalizeWeeklyMealPlanForCompare(weeklyPlan: {
+  [day: string]: DailyMealPlan;
+}) {
+  return DAYS.map((dayName) => {
+    const day = normalizeDayMealPlan(weeklyPlan[dayName] ?? {});
+    return {
+      dayName,
+      breakfast: (day.breakfast ?? "").trim(),
+      lunch: (day.lunch ?? "").trim(),
+      dinner: (day.dinner ?? "").trim(),
+      snacks: (day.snacks ?? "").trim(),
+    };
+  });
+}
+
 function buildWeeklyMealPlanFromDb(days: Array<{
   dayName: string;
   items: Array<{ mealType: string; description: string }>;
@@ -283,17 +400,59 @@ async function persistMealPlan({
   mealPlan,
   source,
   warning,
+  servingCount,
 }: {
   userId: string;
   input: MealPlanRequest;
   mealPlan: { [day: string]: DailyMealPlan };
   source: "provider" | "fallback";
   warning?: string;
-}) {
+  servingCount?: number;
+}): Promise<string | null> {
+  const normalizedServingCount = normalizeServingCount(servingCount);
   const days = normalizeWeeklyMealPlanForDb(mealPlan);
-  if (days.length === 0) return;
+  if (days.length === 0) return null;
 
-  await prisma.mealPlan.create({
+  const latest = await prisma.mealPlan.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    include: {
+      days: {
+        orderBy: { dayOrder: "asc" },
+        include: { items: { orderBy: { sortOrder: "asc" } } },
+      },
+    },
+  });
+
+  if (latest) {
+    const latestInput = normalizeInputForCompare({
+      dietType: latest.dietType ?? undefined,
+      calories: latest.calories ?? undefined,
+      allergies: latest.allergies ?? undefined,
+      cuisine: latest.cuisine ?? undefined,
+      snacks: latest.snacks,
+      servingCount: latest.servingCount ?? 1,
+    });
+    const nextInput = normalizeInputForCompare(input);
+
+    const latestPlanForCompare = normalizeWeeklyMealPlanForCompare(
+      buildWeeklyMealPlanFromDb(latest.days)
+    );
+    const nextPlanForCompare = normalizeWeeklyMealPlanForCompare(mealPlan);
+
+    const sameInput =
+      JSON.stringify(latestInput) === JSON.stringify(nextInput);
+    const samePlan =
+      JSON.stringify(latestPlanForCompare) ===
+      JSON.stringify(nextPlanForCompare);
+    const sameSource = (latest.source ?? "provider") === source;
+
+    if (sameInput && samePlan && sameSource) {
+      return latest.id;
+    }
+  }
+
+  const created = await prisma.mealPlan.create({
     data: {
       userId,
       dietType: input.dietType ?? null,
@@ -301,6 +460,7 @@ async function persistMealPlan({
       allergies: input.allergies ?? null,
       cuisine: input.cuisine ?? null,
       snacks: Boolean(input.snacks),
+      servingCount: normalizedServingCount,
       source,
       warning: warning ?? null,
       days: {
@@ -335,15 +495,17 @@ async function persistMealPlan({
       },
     },
   });
+  return created.id;
 }
 
 async function safePersistMealPlan(
   args: Parameters<typeof persistMealPlan>[0]
-): Promise<void> {
+): Promise<string | null> {
   try {
-    await persistMealPlan(args);
+    return await persistMealPlan(args);
   } catch (error) {
     console.error("Error persisting meal plan:", error);
+    return null;
   }
 }
 
@@ -370,10 +532,12 @@ export async function GET() {
     }
 
     return NextResponse.json({
+      id: latest.id,
       mealPlan: buildWeeklyMealPlanFromDb(latest.days),
       source: latest.source ?? "provider",
       warning: latest.warning ?? undefined,
       createdAt: latest.createdAt,
+      servingCount: latest.servingCount ?? 1,
     });
   } catch (error) {
     console.error("Error fetching latest meal plan:", error);
@@ -397,6 +561,10 @@ export async function POST(request: Request) {
       allergies,
       cuisine,
       snacks = false,
+      servingCount = 1,
+      swapDay,
+      swapMealType,
+      baseMealPlan,
     } = input;
 
     const fallbackPlan = buildFallbackMealPlan({
@@ -406,20 +574,30 @@ export async function POST(request: Request) {
       cuisine,
       snacks,
     });
+    const fallbackFinalPlan = applySwapToWeeklyPlan({
+      baseMealPlan,
+      candidateMealPlan: fallbackPlan,
+      swapDay,
+      swapMealType,
+    });
+
+    let savedPlanId: string | null = null;
 
     if (!API_KEY) {
       if (userId) {
-        await safePersistMealPlan({
+        savedPlanId = await safePersistMealPlan({
           userId,
           input,
-          mealPlan: fallbackPlan,
+          mealPlan: fallbackFinalPlan,
           source: "fallback",
           warning:
             "Missing OpenRouter API key. Returned a locally generated meal plan.",
+          servingCount,
         });
       }
       return NextResponse.json({
-        mealPlan: fallbackPlan,
+        id: savedPlanId ?? undefined,
+        mealPlan: fallbackFinalPlan,
         source: "fallback",
         warning:
           "Missing OpenRouter API key. Returned a locally generated meal plan.",
@@ -428,7 +606,7 @@ export async function POST(request: Request) {
     const openai = createOpenRouterClient(API_KEY);
 
     const prompt = `
-      You are a professional nutritionist. Create a 7-day meal plan for an individual following a ${dietType} diet aiming for ${calories} calories per day.
+      You are a professional nutritionist. Create a 7-day meal plan for a household of ${normalizeServingCount(servingCount)} serving(s) following a ${dietType} diet aiming for ${calories} calories per person per day.
       
       Allergies or restrictions: ${allergies || "none"}.
       Preferred cuisine: ${cuisine || "no preference"}.
@@ -504,20 +682,23 @@ export async function POST(request: Request) {
     }
 
     if (!aiContent) {
+      const userWarning = toUserWarning(lastProviderStatus, lastProviderMessage);
       if (userId) {
-        await safePersistMealPlan({
+        savedPlanId = await safePersistMealPlan({
           userId,
           input,
-          mealPlan: fallbackPlan,
+          mealPlan: fallbackFinalPlan,
           source: "fallback",
-          warning: `Provider request failed (${lastProviderStatus ?? "unknown"}): ${lastProviderMessage}`,
+          warning: userWarning,
+          servingCount,
         });
       }
       return NextResponse.json(
         {
-          mealPlan: fallbackPlan,
+          id: savedPlanId ?? undefined,
+          mealPlan: fallbackFinalPlan,
           source: "fallback",
-          warning: `Provider request failed (${lastProviderStatus ?? "unknown"}): ${lastProviderMessage}`,
+          warning: userWarning,
         },
         { status: 200 }
       );
@@ -529,18 +710,20 @@ export async function POST(request: Request) {
     } catch (parseError) {
       console.error("Error parsing AI response as JSON:", parseError);
       if (userId) {
-        await safePersistMealPlan({
+        savedPlanId = await safePersistMealPlan({
           userId,
           input,
-          mealPlan: fallbackPlan,
+          mealPlan: fallbackFinalPlan,
           source: "fallback",
           warning:
             "Provider returned invalid JSON. Returned a locally generated meal plan.",
+          servingCount,
         });
       }
       return NextResponse.json(
         {
-          mealPlan: fallbackPlan,
+          id: savedPlanId ?? undefined,
+          mealPlan: fallbackFinalPlan,
           source: "fallback",
           warning:
             "Provider returned invalid JSON. Returned a locally generated meal plan.",
@@ -553,16 +736,28 @@ export async function POST(request: Request) {
       throw new Error("Invalid meal plan format received from AI.");
     }
 
+    const finalPlan = applySwapToWeeklyPlan({
+      baseMealPlan,
+      candidateMealPlan: parsedMealPlan,
+      swapDay,
+      swapMealType,
+    });
+
     if (userId) {
-      await safePersistMealPlan({
+      savedPlanId = await safePersistMealPlan({
         userId,
         input,
-        mealPlan: parsedMealPlan,
+        mealPlan: finalPlan,
         source: "provider",
+        servingCount,
       });
     }
 
-    return NextResponse.json({ mealPlan: parsedMealPlan, source: "provider" });
+    return NextResponse.json({
+      id: savedPlanId ?? undefined,
+      mealPlan: finalPlan,
+      source: "provider",
+    });
   } catch (error) {
     console.error("Error generating meal plan:", error);
     const { status, message } = getProviderErrorDetails(error);
@@ -575,6 +770,7 @@ export async function POST(request: Request) {
         mealPlan: fallbackPlan,
         source: "fallback",
         warning: `Unexpected error (${status ?? 500}): ${message}`,
+        servingCount: 1,
       });
     }
     return NextResponse.json(
