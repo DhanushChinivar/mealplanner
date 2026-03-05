@@ -95,7 +95,7 @@ export function GroceryList({ items, onDownload }: GroceryListProps) {
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10 rounded-xl transition-colors"
           >
             <Download className="w-4 h-4" />
-            Download
+            Download PDF
           </button>
         )}
       </div>

@@ -733,6 +733,84 @@ export default function MealPlanDashboard() {
     }
   };
 
+  const handleDownloadGroceryPdf = () => {
+    if (groceryItems.length === 0) return;
+
+    const grouped = groceryItems.reduce<Record<string, GroceryItem[]>>((acc, item) => {
+      const key = item.category || "other";
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    }, {});
+
+    const categoryLabels: Record<string, string> = {
+      proteins: "Proteins",
+      produce: "Produce",
+      grains: "Grains",
+      dairy: "Dairy",
+      spices: "Spices",
+      other: "Other",
+    };
+
+    const sectionHtml = Object.entries(grouped)
+      .map(([category, items]) => {
+        const itemRows = items
+          .map(
+            (item) =>
+              `<li><span>${item.name}</span><span>${item.totalAmount} ${item.unit}</span></li>`
+          )
+          .join("");
+
+        return `
+          <section>
+            <h2>${categoryLabels[category] ?? category}</h2>
+            <ul>${itemRows}</ul>
+          </section>
+        `;
+      })
+      .join("");
+
+    const createdAt = new Date().toLocaleString();
+    const html = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>MealPlanner Grocery List</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
+            h1 { margin: 0 0 6px; color: #047857; }
+            p.meta { margin: 0 0 16px; color: #475569; font-size: 12px; }
+            section { margin: 14px 0; padding: 12px; border: 1px solid #d1fae5; border-radius: 10px; }
+            h2 { margin: 0 0 8px; font-size: 16px; color: #065f46; }
+            ul { list-style: none; margin: 0; padding: 0; }
+            li { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
+            li:last-child { border-bottom: none; }
+          </style>
+        </head>
+        <body>
+          <h1>MealPlanner Grocery List</h1>
+          <p class="meta">Generated: ${createdAt} • Servings: ${servingCount}</p>
+          ${sectionHtml}
+          <script>
+            window.onload = function () {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const blobUrl = URL.createObjectURL(blob);
+    const popup = window.open(blobUrl, "_blank");
+    if (!popup) {
+      URL.revokeObjectURL(blobUrl);
+      return;
+    }
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+  };
+
   const fetchProgressSummary = async () => {
     try {
       setIsProgressLoading(true);
@@ -963,6 +1041,7 @@ export default function MealPlanDashboard() {
 
   const todaysMealPlan = getMealPlanForDay(today);
   const selectedHistoryItem = historyItems.find((item) => item.id === selectedPlanId);
+  const currentProgressCalories = Math.round(calories * 0.75);
   const scrollToPlannerSection = (section: "plan" | "analytics") => {
     setActivePlannerSection(section);
     if (activeTab !== "planner") {
@@ -1033,7 +1112,11 @@ export default function MealPlanDashboard() {
         )}
 
         <div className="relative">
-          <aside className="mb-6 w-full xl:mb-0 xl:w-64 xl:fixed xl:left-6 2xl:left-10 xl:top-[145px] xl:z-30">
+          <aside
+            className={`mt-3 mb-6 w-full xl:mb-0 xl:mt-0 xl:w-64 xl:fixed xl:left-6 2xl:left-10 xl:z-30 ${
+              isOnTrial ? "xl:top-[205px]" : "xl:top-[155px]"
+            }`}
+          >
             <div className="rounded-2xl border border-emerald-100 bg-white/90 p-3 shadow-sm">
               <button
                 type="button"
@@ -1126,55 +1209,9 @@ export default function MealPlanDashboard() {
           <>
           {/* Left Sidebar - Controls */}
           <aside className="w-full">
-            <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
-              {/* Quick Stats Card */}
-              <div className="w-full bg-white/85 backdrop-blur-sm rounded-3xl p-8 sm:p-10 shadow-xl shadow-gray-200/60 border border-white/60">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="p-3 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl">
-                  <Target className="w-6 h-6 text-white" />
-                </div>
-                <h2 className="font-bold text-xl text-gray-800">Daily Goals</h2>
-              </div>
-
-              <div className="space-y-8">
-                <CalorieProgressBar current={calories * 0.75} goal={calories} />
-
-                <div className="flex items-center justify-center py-4">
-                  <MacroPieChart protein={30} carbs={45} fats={25} />
-                </div>
-
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="p-5 bg-red-50 rounded-2xl">
-                    <Beef className="w-7 h-7 text-red-500 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">Protein</p>
-                    <p className="font-bold text-xl text-red-600">30%</p>
-                  </div>
-                  <div className="p-5 bg-amber-50 rounded-2xl">
-                    <Wheat className="w-7 h-7 text-amber-500 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">Carbs</p>
-                    <p className="font-bold text-xl text-amber-600">45%</p>
-                  </div>
-                  <div className="p-5 bg-green-50 rounded-2xl">
-                    <Droplets className="w-7 h-7 text-green-500 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">Fats</p>
-                    <p className="font-bold text-xl text-green-600">25%</p>
-                  </div>
-                </div>
-                {hasMealPlan && (
-                  <div className="rounded-2xl p-4 bg-emerald-50 border border-emerald-100">
-                    <p className="text-sm font-medium text-emerald-700">
-                      Adherence: {adherenceSummary.adherence}%
-                    </p>
-                    <p className="text-xs text-emerald-600 mt-1">
-                      {adherenceSummary.completedMeals} of {adherenceSummary.totalMeals} meals completed
-                    </p>
-                  </div>
-                )}
-              </div>
-              </div>
-
+            <div className="grid grid-cols-1 gap-8 xl:grid-cols-2 xl:items-start">
               {/* Preferences Card */}
-              <form onSubmit={handleSubmit} className="w-full bg-white/85 backdrop-blur-sm rounded-3xl p-8 sm:p-10 shadow-xl shadow-gray-200/60 border border-white/60 space-y-8">
+              <form onSubmit={handleSubmit} className="order-1 w-full bg-white/85 backdrop-blur-sm rounded-3xl p-8 sm:p-10 shadow-xl shadow-gray-200/60 border border-white/60 space-y-8 xl:sticky xl:top-[168px]">
               <div className="flex items-center gap-4 mb-4">
                 <div className="p-3 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl">
                   <Sparkles className="w-6 h-6 text-white" />
@@ -1279,13 +1316,13 @@ export default function MealPlanDashboard() {
                 <button
                   type="button"
                   onClick={() => setSnacks(!snacks)}
-                  className={`relative w-14 h-7 rounded-full transition-colors duration-300 ${
+                  className={`relative h-8 w-20 rounded-full transition-colors duration-300 ${
                     snacks ? "bg-emerald-500" : "bg-gray-300"
                   }`}
                 >
-                  <span 
-                    className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 ${
-                      snacks ? "translate-x-8" : "translate-x-1"
+                  <span
+                    className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow transition-transform duration-300 ${
+                      snacks ? "translate-x-12" : "translate-x-0"
                     }`}
                   />
                 </button>
@@ -1317,6 +1354,52 @@ export default function MealPlanDashboard() {
                 </div>
               )}
               </form>
+
+              {/* Quick Stats Card */}
+              <div className="order-2 w-full bg-white/85 backdrop-blur-sm rounded-3xl p-8 sm:p-10 shadow-xl shadow-gray-200/60 border border-white/60">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="p-3 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl">
+                  <Target className="w-6 h-6 text-white" />
+                </div>
+                <h2 className="font-bold text-xl text-gray-800">Daily Goals</h2>
+              </div>
+
+              <div className="space-y-8">
+                <CalorieProgressBar current={currentProgressCalories} goal={calories} />
+
+                <div className="flex items-center justify-center py-4">
+                  <MacroPieChart protein={30} carbs={45} fats={25} />
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="p-5 bg-red-50 rounded-2xl">
+                    <Beef className="w-7 h-7 text-red-500 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Protein</p>
+                    <p className="font-bold text-xl text-red-600">30%</p>
+                  </div>
+                  <div className="p-5 bg-amber-50 rounded-2xl">
+                    <Wheat className="w-7 h-7 text-amber-500 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Carbs</p>
+                    <p className="font-bold text-xl text-amber-600">45%</p>
+                  </div>
+                  <div className="p-5 bg-green-50 rounded-2xl">
+                    <Droplets className="w-7 h-7 text-green-500 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Fats</p>
+                    <p className="font-bold text-xl text-green-600">25%</p>
+                  </div>
+                </div>
+                {hasMealPlan && (
+                  <div className="rounded-2xl p-4 bg-emerald-50 border border-emerald-100">
+                    <p className="text-sm font-medium text-emerald-700">
+                      Adherence: {adherenceSummary.adherence}%
+                    </p>
+                    <p className="text-xs text-emerald-600 mt-1">
+                      {adherenceSummary.completedMeals} of {adherenceSummary.totalMeals} meals completed
+                    </p>
+                  </div>
+                )}
+              </div>
+              </div>
             </div>
           </aside>
 
@@ -1748,7 +1831,7 @@ export default function MealPlanDashboard() {
               {isGroceryLoading ? (
                 <p className="text-sm text-gray-500">Syncing grocery list...</p>
               ) : (
-                <GroceryList items={groceryItems} />
+                <GroceryList items={groceryItems} onDownload={handleDownloadGroceryPdf} />
               )}
             </section>
           )}
