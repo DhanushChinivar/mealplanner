@@ -58,7 +58,6 @@ export async function POST() {
           email,
           subscriptionActive: false,
           subscriptionTier: trialTier,
-          stripeSubscriptionId: null,
         },
       });
     } else {
