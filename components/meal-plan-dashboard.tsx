@@ -792,23 +792,21 @@ export default function MealPlanDashboard() {
           <h1>MealPlanner Grocery List</h1>
           <p class="meta">Generated: ${createdAt} • Servings: ${servingCount}</p>
           ${sectionHtml}
-          <script>
-            window.onload = function () {
-              window.print();
-            };
-          </script>
         </body>
       </html>
     `;
 
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const blobUrl = URL.createObjectURL(blob);
-    const popup = window.open(blobUrl, "_blank");
-    if (!popup) {
-      URL.revokeObjectURL(blobUrl);
-      return;
-    }
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    const popup = window.open("", "_blank");
+    if (!popup) return;
+
+    popup.document.open();
+    popup.document.write(html);
+    popup.document.close();
+
+    popup.onload = () => {
+      popup.focus();
+      popup.print();
+    };
   };
 
   const fetchProgressSummary = async () => {
