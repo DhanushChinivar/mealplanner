@@ -1,7 +1,6 @@
 // components/MealPlanDashboard.tsx
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect, useRef, type ElementType, type FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -21,20 +20,16 @@ import {
   RefreshCw,
   Target,
   TrendingUp,
-  Apple,
   Beef,
   Wheat,
   Droplets,
   Clock,
   Calendar,
   ChevronDown,
-  ChevronRight,
   Zap,
-  Heart,
   AlertCircle,
   Check,
   Salad,
-  Fish,
   Loader2,
   ShoppingCart,
   History,
@@ -385,7 +380,7 @@ const AILoadingAnimation = () => {
       setTipIndex((prev) => (prev + 1) % tips.length);
     }, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [tips.length]);
 
   return (
     <div className="flex flex-col items-center justify-center py-24 space-y-10">
@@ -539,7 +534,7 @@ export default function MealPlanDashboard() {
   const [activeTab, setActiveTab] = useState<"planner" | "history" | "grocery">(
     "planner"
   );
-  const [dietType, setDietType] = useState("");
+  const [dietType] = useState("");
   const [calories, setCalories] = useState<number>(2000);
   const [allergies, setAllergies] = useState("");
   const [cuisine, setCuisine] = useState("");
@@ -1421,7 +1416,7 @@ export default function MealPlanDashboard() {
                       <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                         <Zap className="w-6 h-6" />
                       </div>
-                      <h2 className="text-xl font-bold">Today's Highlights</h2>
+                      <h2 className="text-xl font-bold">Today&apos;s Highlights</h2>
                     </div>
                     <div className="grid sm:grid-cols-3 gap-5">
                       <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5">
