@@ -28,7 +28,7 @@ export function MealPlanFooter() {
               <Utensils className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="font-bold text-foreground">MealPlanAI</h3>
+              <h3 className="font-bold text-foreground">MealsForge</h3>
               <p className="text-sm text-muted-foreground">Smart nutrition made simple</p>
             </div>
           </div>
@@ -56,7 +56,7 @@ export function MealPlanFooter() {
 
         <div className="text-center mt-8 pt-6 border-t border-border/50">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} MealPlanAI. All rights reserved.
+            © {new Date().getFullYear()} MealsForge. All rights reserved.
           </p>
         </div>
       </div>
