@@ -17,8 +17,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Meal Planner",
-  description: "Personalized AI-based meal planning app",
+  title: "MealsForge",
+  description: "MealsForge - personalized AI-based meal planning",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

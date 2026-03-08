@@ -771,7 +771,7 @@ export default function MealPlanDashboard() {
       <html>
         <head>
           <meta charset="utf-8" />
-          <title>MealPlanner Grocery List</title>
+          <title>MealsForge Grocery List</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
             h1 { margin: 0 0 6px; color: #047857; }
@@ -784,7 +784,7 @@ export default function MealPlanDashboard() {
           </style>
         </head>
         <body>
-          <h1>MealPlanner Grocery List</h1>
+          <h1>MealsForge Grocery List</h1>
           <p class="meta">Generated: ${createdAt} • Servings: ${servingCount}</p>
           ${sectionHtml}
         </body>
@@ -1181,7 +1181,7 @@ export default function MealPlanDashboard() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.15em] text-emerald-600">
-                  Meal Planner Dashboard
+                  MealsForge Dashboard
                 </p>
                 <h1 className="mt-2 text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-gray-900">
                   Plan Smarter. Eat Better.

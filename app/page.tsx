@@ -24,7 +24,7 @@ const testimonials = [
     name: "Sarah Mitchell",
     role: "Fitness Enthusiast",
     image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face",
-    content: "MealPlanAI has completely transformed how I approach nutrition. The personalized plans fit perfectly with my workout routine!",
+    content: "MealsForge has completely transformed how I approach nutrition. The personalized plans fit perfectly with my workout routine!",
     rating: 5
   },
   {
@@ -160,9 +160,9 @@ export default function HomePage() {
           <div className="grid lg:grid-cols-12 gap-3 sm:gap-4">
             <div className="lg:col-span-3 space-y-3 sm:space-y-4">
               <div className="relative min-h-[190px] overflow-hidden rounded-2xl border border-white/20">
-                <img src={showcaseImages.leftTop} alt="Structured Meal Planner" className="absolute inset-0 h-full w-full object-cover" />
+                <img src={showcaseImages.leftTop} alt="Structured MealsForge Planner" className="absolute inset-0 h-full w-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/15 to-transparent" />
-                <p className="absolute left-5 bottom-4 text-white text-lg font-semibold tracking-tight">Structured Meal Planner</p>
+                <p className="absolute left-5 bottom-4 text-white text-lg font-semibold tracking-tight">Structured MealsForge Planner</p>
               </div>
               <div className="relative min-h-[190px] overflow-hidden rounded-2xl border border-white/20">
                 <img src={showcaseImages.leftBottom} alt="Family-Friendly Menus" className="absolute inset-0 h-full w-full object-cover" />
@@ -282,6 +282,62 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Family Scenario Section */}
+      <section className="py-20 lg:py-24 bg-[#eaf8f1]">
+        <div className="w-full max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16 2xl:px-20">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+            <div className="relative rounded-3xl overflow-hidden border border-emerald-200 bg-white shadow-xl min-h-[460px]">
+              <Image
+                src="https://images.unsplash.com/photo-1606787366850-de6330128bfc?w=1800&auto=format&fit=crop&q=80"
+                alt="Mom cooking with kids in kitchen"
+                fill
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0f3b2f]/45 via-transparent to-[#1f6a53]/20" />
+              <div className="absolute left-6 top-6 rounded-xl bg-white/90 border border-emerald-100 px-4 py-3 text-base font-semibold text-emerald-900 shadow">
+                Kids + Mom Meal Prep
+              </div>
+              <div className="absolute left-6 bottom-8 rounded-xl bg-emerald-700/95 px-5 py-3 text-base font-semibold text-white shadow-lg">
+                Family menu in 20 mins
+              </div>
+            </div>
+
+            <div>
+              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-[#123126] mb-6">
+                Built For <span className="text-emerald-700">Real Families</span>
+              </h2>
+              <p className="text-xl sm:text-2xl leading-relaxed text-[#2a5747] max-w-2xl">
+                From busy school mornings to weeknight dinners, MealsForge adapts to family routines with practical recipes everyone can enjoy.
+              </p>
+
+              <div className="mt-8 grid sm:grid-cols-2 gap-4">
+                <div className="relative h-44 rounded-2xl overflow-hidden border border-emerald-200 bg-white">
+                  <img
+                    src="https://images.unsplash.com/photo-1528715471579-d1bcf0ba5e83?w=1200&auto=format&fit=crop&q=80"
+                    alt="Husband and wife cooking together"
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+                  <p className="absolute left-3 bottom-2 text-white text-sm font-semibold">
+                    Couple Cooking Night
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-emerald-200 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                    Family-Focused Benefits
+                  </p>
+                  <div className="mt-3 space-y-2 text-sm text-[#21513f]">
+                    <p>• Kid-friendly options without separate meal prep</p>
+                    <p>• Shared grocery planning for the whole household</p>
+                    <p>• Quick swaps for picky eaters and preferences</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* How It Works Section */}
       <section id="how-it-works" className="py-24 lg:py-32 relative bg-[#f4fbf7]">
         <div className="relative w-full max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16 2xl:px-20">
@@ -329,7 +385,7 @@ export default function HomePage() {
               <Heart className="w-4 h-4" /> Loved by Thousands
             </div>
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-4 tracking-tight">What Our Users Say</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">Join thousands who transformed their eating habits with MealPlanAI.</p>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">Join thousands who transformed their eating habits with MealsForge.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">

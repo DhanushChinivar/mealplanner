@@ -17,7 +17,7 @@ export default function NavBar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-3.5">
           <Image src="/logo.png" width={52} height={52} alt="Logo" />
-          <span className="text-[2rem] sm:text-[2.15rem] font-bold text-emerald-600 leading-none tracking-tight">MealPlanner</span>
+          <span className="text-[2rem] sm:text-[2.15rem] font-bold text-emerald-600 leading-none tracking-tight">MealsForge</span>
         </Link>
 
         {/* Nav Links */}

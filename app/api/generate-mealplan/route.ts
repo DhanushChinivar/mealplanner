@@ -15,7 +15,7 @@ function createOpenRouterClient(apiKey: string) {
     defaultHeaders: {
       "HTTP-Referer":
         process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-      "X-Title": "mealplanner",
+      "X-Title": "mealsforge",
     },
   });
 }
