@@ -35,6 +35,7 @@ import {
   History,
   LayoutPanelLeft,
   Users,
+  Trash2,
 } from "lucide-react";
 
 interface DailyMealPlan {
@@ -60,6 +61,11 @@ interface MealPlanResponse {
   createdAt?: string;
   id?: string;
   servingCount?: number;
+  dietType?: string;
+  calories?: number;
+  allergies?: string;
+  cuisine?: string;
+  snacks?: boolean;
 }
 
 interface MealPlanHistoryItem {
@@ -365,7 +371,7 @@ const MealCard = ({
 };
 
 // AI Loading Animation
-const AILoadingAnimation = () => {
+const AILoadingAnimation = ({ isGenerating = true }: { isGenerating?: boolean }) => {
   const [tipIndex, setTipIndex] = useState(0);
   const tips = [
     "Analyzing your nutritional goals...",
@@ -376,11 +382,21 @@ const AILoadingAnimation = () => {
   ];
 
   useEffect(() => {
+    if (!isGenerating) return;
     const interval = setInterval(() => {
       setTipIndex((prev) => (prev + 1) % tips.length);
     }, 2000);
     return () => clearInterval(interval);
-  }, [tips.length]);
+  }, [tips.length, isGenerating]);
+
+  if (!isGenerating) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 space-y-5">
+        <Loader2 className="w-12 h-12 text-emerald-500 animate-spin" />
+        <p className="text-gray-500 font-medium">Loading your planner...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center py-24 space-y-10">
@@ -592,6 +608,47 @@ export default function MealPlanDashboard() {
   const weeklyPlanRef = useRef<HTMLDivElement | null>(null);
   const weeklyAnalyticsRef = useRef<HTMLDivElement | null>(null);
 
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const loadFormFromPlan = (plan: MealPlanResponse | null) => {
+    if (!plan) return;
+    if (plan.dietType) {
+      setIsVegetarian(plan.dietType.includes("Vegetarian"));
+      setIsHighProtein(plan.dietType.includes("High-Protein"));
+      setIsLowCarb(plan.dietType.includes("Low-Carb"));
+    }
+    if (plan.calories) setCalories(plan.calories);
+    if (plan.allergies !== undefined) setAllergies(plan.allergies);
+    if (plan.cuisine !== undefined) setCuisine(plan.cuisine);
+    if (typeof plan.snacks === "boolean") setSnacks(plan.snacks);
+    if (plan.servingCount) setServingCount(plan.servingCount);
+  };
+
+  const handleDeletePlan = async () => {
+    try {
+      setIsDeleting(true);
+      const res = await fetch(`/api/mealplans?planId=all`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        setSelectedPlanData(null);
+        setSelectedPlanId(null);
+        setMealStatuses({});
+        setAdherenceSummary({
+          totalMeals: 0,
+          completedMeals: 0,
+          skippedMeals: 0,
+          adherence: 0,
+        });
+        await fetchMealHistory();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const fetchTrialStatus = async () => {
     if (!user?.id) return;
     try {
@@ -695,7 +752,7 @@ export default function MealPlanDashboard() {
       if (data.selected) {
         setSelectedPlanData(data.selected);
         setSelectedPlanId(planId);
-        setServingCount(data.selected.servingCount ?? 1);
+        loadFormFromPlan(data.selected);
         await fetchMealLogs(planId);
         await fetchMealAnalytics(planId);
       }
@@ -837,7 +894,7 @@ export default function MealPlanDashboard() {
         if (data?.mealPlan) {
           setSelectedPlanData(data);
           setSelectedPlanId(data.id ?? null);
-          setServingCount(data.servingCount ?? 1);
+          loadFormFromPlan(data);
         }
       } catch (error) {
         console.error("Failed to load latest meal plan:", error);
@@ -871,9 +928,7 @@ export default function MealPlanDashboard() {
     onSuccess: async (data) => {
       setSelectedPlanData(data ?? null);
       setSelectedPlanId(data?.id ?? null);
-      if (typeof data?.servingCount === "number") {
-        setServingCount(data.servingCount);
-      }
+      loadFormFromPlan(data);
       await fetchMealLogs(data?.id ?? undefined);
       await fetchMealAnalytics(data?.id ?? undefined);
       await fetchMealHistory();
@@ -1400,7 +1455,7 @@ export default function MealPlanDashboard() {
           <section className="w-full">
             {mutation.isPending || isLoadingInitialPlan ? (
               <div className="bg-white/85 backdrop-blur-sm rounded-3xl shadow-xl shadow-gray-200/60 border border-white/60 min-h-[520px]">
-                <AILoadingAnimation />
+                <AILoadingAnimation isGenerating={mutation.isPending} />
               </div>
             ) : hasMealPlan ? (
               <div className="space-y-8">
@@ -1453,21 +1508,31 @@ export default function MealPlanDashboard() {
                       </div>
                       <h2 className="font-bold text-base text-gray-800">Weekly Meal Plan</h2>
                     </div>
-                    <button
-                      onClick={() => mutation.mutate({
-                        dietType: dietType || "Balanced",
-                        calories,
-                        allergies,
-                        cuisine,
-                        snacks,
-                        servingCount,
-                        days: 7,
-                      })}
-                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Regenerate All
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleDeletePlan}
+                        disabled={isDeleting}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        {isDeleting ? "Clearing..." : "Clear Plan"}
+                      </button>
+                      <button
+                        onClick={() => mutation.mutate({
+                          dietType: dietType || "Balanced",
+                          calories,
+                          allergies,
+                          cuisine,
+                          snacks,
+                          servingCount,
+                          days: 7,
+                        })}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Regenerate All
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-4">

@@ -80,6 +80,11 @@ export async function GET(req: NextRequest) {
         source: selected.source ?? "provider",
         warning: selected.warning ?? undefined,
         servingCount: selected.servingCount ?? 1,
+        dietType: selected.dietType ?? "",
+        calories: selected.calories ?? 2000,
+        allergies: selected.allergies ?? "",
+        cuisine: selected.cuisine ?? "",
+        snacks: selected.snacks ?? false,
         mealPlan: buildWeeklyMealPlanFromDb(selected.days),
       },
     });
@@ -87,6 +92,40 @@ export async function GET(req: NextRequest) {
     console.error("Error fetching meal plan history:", error);
     return NextResponse.json(
       { error: "Failed to fetch meal plan history." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const clerkUser = await currentUser();
+    if (!clerkUser?.id) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const planId = searchParams.get("planId");
+
+    if (!planId) {
+      return NextResponse.json({ error: "Plan ID required." }, { status: 400 });
+    }
+
+    if (planId === "all") {
+      await prisma.mealPlan.deleteMany({
+        where: { userId: clerkUser.id },
+      });
+    } else {
+      await prisma.mealPlan.delete({
+        where: { id: planId, userId: clerkUser.id },
+      });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting meal plan:", error);
+    return NextResponse.json(
+      { error: "Failed to delete meal plan." },
       { status: 500 }
     );
   }
