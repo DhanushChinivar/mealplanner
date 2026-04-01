@@ -226,7 +226,7 @@ const CalorieProgressBar = ({ current, goal }: { current: number; goal: number }
   
   return (
     <div className="space-y-3">
-      <div className="flex justify-between text-base">
+      <div className="flex justify-between text-sm">
         <span className="text-gray-600 font-medium">Daily Progress</span>
         <span className="font-bold text-emerald-600">{current} / {goal} kcal</span>
       </div>
@@ -255,13 +255,13 @@ const ToggleButton = ({
   <button
     type="button"
     onClick={onClick}
-    className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${
+    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all duration-300 ${
       active 
         ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-105" 
         : "bg-white/60 text-gray-600 hover:bg-white hover:shadow-md"
     }`}
   >
-    <Icon className="w-5 h-5" />
+    <Icon className="w-4 h-4" />
     {label}
   </button>
 );
@@ -288,16 +288,16 @@ const MealCard = ({
   const prepTime = meal ? Math.floor(15 + Math.random() * 30) : 0;
 
   return (
-    <div className="group relative bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-white/50">
+    <div className="group relative bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-white/50">
       <div className={`absolute inset-0 ${gradient} opacity-0 group-hover:opacity-5 rounded-2xl transition-opacity duration-300`} />
       
       <div className="relative">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className={`p-3 rounded-xl ${gradient} bg-opacity-10`}>
-              <Icon className="w-6 h-6 text-emerald-600" />
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className={`p-2 rounded-xl ${gradient} bg-opacity-10`}>
+              <Icon className="w-4 h-4 text-emerald-600" />
             </div>
-            <h4 className="font-semibold text-gray-800 text-lg">{type}</h4>
+            <h4 className="font-semibold text-gray-800 text-sm">{type}</h4>
           </div>
           <div className="flex items-center gap-2">
             {meal && onSetStatus && (
@@ -344,20 +344,20 @@ const MealCard = ({
         
         {meal ? (
           <>
-            <p className="text-gray-700 mb-4 text-base leading-relaxed">{meal}</p>
-            <div className="flex items-center gap-6 text-sm text-gray-500">
-              <span className="flex items-center gap-2">
-                <Flame className="w-4 h-4 text-orange-400" />
+            <p className="text-gray-700 mb-3 text-sm leading-relaxed">{meal}</p>
+            <div className="flex items-center gap-4 text-xs text-gray-500">
+              <span className="flex items-center gap-1">
+                <Flame className="w-3.5 h-3.5 text-orange-400" />
                 ~{estimatedCalories} kcal
               </span>
-              <span className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-blue-400" />
+              <span className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-blue-400" />
                 {prepTime} min
               </span>
             </div>
           </>
         ) : (
-          <p className="text-gray-400 italic text-base">No meal planned</p>
+          <p className="text-gray-400 italic text-sm">No meal planned</p>
         )}
       </div>
     </div>
@@ -393,8 +393,8 @@ const AILoadingAnimation = () => {
       </div>
       
       <div className="text-center space-y-3">
-        <h3 className="text-2xl font-semibold text-gray-800">AI Chef at Work</h3>
-        <p className="text-emerald-600 animate-pulse transition-all duration-500 text-lg">
+        <h3 className="text-xl font-semibold text-gray-800">AI Chef at Work</h3>
+        <p className="text-emerald-600 animate-pulse transition-all duration-500 text-base">
           {tips[tipIndex]}
         </p>
       </div>
@@ -454,9 +454,9 @@ const DayCard = ({
           <Calendar className={`w-6 h-6 ${isToday ? "text-emerald-600" : "text-gray-500"}`} />
         </div>
         <div className="text-left">
-          <h3 className={`font-semibold text-lg ${isToday ? "text-emerald-700" : "text-gray-800"}`}>
+          <h3 className={`font-semibold text-base ${isToday ? "text-emerald-700" : "text-gray-800"}`}>
             {day}
-            {isToday && <span className="ml-3 text-xs bg-emerald-500 text-white px-3 py-1 rounded-full">Today</span>}
+            {isToday && <span className="ml-2 text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full">Today</span>}
           </h3>
           {mealPlan && !isExpanded && (
             <p className="text-sm text-gray-500 truncate max-w-xs mt-1">
@@ -1058,7 +1058,7 @@ export default function MealPlanDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-[#f9fffc] to-teal-50 pt-[104px]">
-      <main className="w-full px-5 sm:px-8 lg:px-12 2xl:px-16 py-10 sm:py-12">
+      <main className="w-full px-4 sm:px-6 lg:px-8 2xl:px-12 py-6 sm:py-8">
         {isOnTrial && (
           <div className="mb-6 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-5 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1177,16 +1177,16 @@ export default function MealPlanDashboard() {
           </aside>
 
           <div className="xl:ml-[19rem]">
-          <section className="mb-8 rounded-3xl border border-emerald-100 bg-white/75 backdrop-blur-sm px-6 py-6 sm:px-8">
+          <section className="mb-6 rounded-2xl border border-emerald-100 bg-white/75 backdrop-blur-sm px-5 py-5 sm:px-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.15em] text-emerald-600">
+                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-emerald-600">
                   MealsForge Dashboard
                 </p>
-                <h1 className="mt-2 text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-gray-900">
+                <h1 className="mt-1.5 text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-gray-900">
                   Plan Smarter. Eat Better.
                 </h1>
-                <p className="mt-2 text-base sm:text-lg text-gray-600 max-w-3xl">
+                <p className="mt-1.5 text-sm sm:text-base text-gray-600 max-w-3xl">
                   Build a weekly plan, track progress, and regenerate meals instantly.
                 </p>
               </div>
@@ -1204,18 +1204,18 @@ export default function MealPlanDashboard() {
           <aside className="w-full">
             <div className="grid grid-cols-1 gap-8 xl:grid-cols-2 xl:items-start">
               {/* Preferences Card */}
-              <form onSubmit={handleSubmit} className="order-1 w-full bg-white/85 backdrop-blur-sm rounded-3xl p-8 sm:p-10 shadow-xl shadow-gray-200/60 border border-white/60 space-y-8 xl:sticky xl:top-[168px]">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="p-3 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl">
-                  <Sparkles className="w-6 h-6 text-white" />
+              <form onSubmit={handleSubmit} className="order-1 w-full bg-white/85 backdrop-blur-sm rounded-2xl p-5 sm:p-6 shadow-lg shadow-gray-200/50 border border-white/60 space-y-5 xl:sticky xl:top-[168px]">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2.5 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl">
+                  <Sparkles className="w-5 h-5 text-white" />
                 </div>
-                <h2 className="font-bold text-xl text-gray-800">Preferences</h2>
+                <h2 className="font-bold text-base text-gray-800">Preferences</h2>
               </div>
 
               {/* Diet Toggles */}
-              <div className="space-y-4">
-                <label className="text-base font-medium text-gray-700 flex items-center gap-2">
-                  <Leaf className="w-5 h-5 text-emerald-500" />
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Leaf className="w-4 h-4 text-emerald-500" />
                   Diet Style
                 </label>
                 <div className="flex flex-wrap gap-3">
@@ -1226,10 +1226,10 @@ export default function MealPlanDashboard() {
               </div>
 
               {/* Calorie Slider */}
-              <div className="space-y-4">
-                <label className="text-base font-medium text-gray-700 flex items-center gap-2">
-                  <Flame className="w-5 h-5 text-orange-500" />
-                  Daily Calories: <span className="text-emerald-600 font-bold text-lg">{calories} kcal</span>
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-orange-500" />
+                  Daily Calories: <span className="text-emerald-600 font-bold text-base">{calories} kcal</span>
                 </label>
                 <input
                   type="range"
@@ -1247,9 +1247,9 @@ export default function MealPlanDashboard() {
               </div>
 
               {/* Cuisine Input */}
-              <div className="space-y-3">
-                <label className="text-base font-medium text-gray-700 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-emerald-500" />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-emerald-500" />
                   Serving Count
                 </label>
                 <div className="grid grid-cols-4 gap-2">
@@ -1271,40 +1271,40 @@ export default function MealPlanDashboard() {
               </div>
 
               {/* Cuisine Input */}
-              <div className="space-y-3">
-                <label className="text-base font-medium text-gray-700 flex items-center gap-2">
-                  <Utensils className="w-5 h-5 text-purple-500" />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Utensils className="w-4 h-4 text-purple-500" />
                   Preferred Cuisine
                 </label>
                 <input
                   type="text"
                   value={cuisine}
                   onChange={(e) => setCuisine(e.target.value)}
-                  className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-base"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-sm"
                   placeholder="e.g., Italian, Asian, Mediterranean"
                 />
               </div>
 
               {/* Allergies Input */}
-              <div className="space-y-3">
-                <label className="text-base font-medium text-gray-700 flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-red-500" />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-500" />
                   Allergies / Restrictions
                 </label>
                 <input
                   type="text"
                   value={allergies}
                   onChange={(e) => setAllergies(e.target.value)}
-                  className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-base"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-sm"
                   placeholder="e.g., Nuts, Dairy, Gluten"
                 />
               </div>
 
               {/* Snacks Toggle */}
-              <div className="flex items-center justify-between p-5 bg-gray-50 rounded-xl">
-                <div className="flex items-center gap-4">
-                  <Cookie className="w-6 h-6 text-amber-500" />
-                  <span className="text-base font-medium text-gray-700">Include Snacks</span>
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <Cookie className="w-5 h-5 text-amber-500" />
+                  <span className="text-sm font-medium text-gray-700">Include Snacks</span>
                 </div>
                 <button
                   type="button"
@@ -1325,7 +1325,7 @@ export default function MealPlanDashboard() {
               <button
                 type="submit"
                 disabled={mutation.isPending}
-                className="w-full py-5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold text-lg rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-3"
+                className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-2"
               >
                 {mutation.isPending ? (
                   <>
@@ -1349,12 +1349,12 @@ export default function MealPlanDashboard() {
               </form>
 
               {/* Quick Stats Card */}
-              <div className="order-2 w-full bg-white/85 backdrop-blur-sm rounded-3xl p-8 sm:p-10 shadow-xl shadow-gray-200/60 border border-white/60">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="p-3 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl">
-                  <Target className="w-6 h-6 text-white" />
+              <div className="order-2 w-full bg-white/85 backdrop-blur-sm rounded-2xl p-5 sm:p-6 shadow-lg shadow-gray-200/50 border border-white/60">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2.5 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl">
+                  <Target className="w-5 h-5 text-white" />
                 </div>
-                <h2 className="font-bold text-xl text-gray-800">Daily Goals</h2>
+                <h2 className="font-bold text-base text-gray-800">Daily Goals</h2>
               </div>
 
               <div className="space-y-8">
@@ -1364,21 +1364,21 @@ export default function MealPlanDashboard() {
                   <MacroPieChart protein={30} carbs={45} fats={25} />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="p-5 bg-red-50 rounded-2xl">
-                    <Beef className="w-7 h-7 text-red-500 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">Protein</p>
-                    <p className="font-bold text-xl text-red-600">30%</p>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="p-3 bg-red-50 rounded-2xl">
+                    <Beef className="w-5 h-5 text-red-500 mx-auto mb-1.5" />
+                    <p className="text-xs text-gray-500">Protein</p>
+                    <p className="font-bold text-base text-red-600">30%</p>
                   </div>
-                  <div className="p-5 bg-amber-50 rounded-2xl">
-                    <Wheat className="w-7 h-7 text-amber-500 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">Carbs</p>
-                    <p className="font-bold text-xl text-amber-600">45%</p>
+                  <div className="p-3 bg-amber-50 rounded-2xl">
+                    <Wheat className="w-5 h-5 text-amber-500 mx-auto mb-1.5" />
+                    <p className="text-xs text-gray-500">Carbs</p>
+                    <p className="font-bold text-base text-amber-600">45%</p>
                   </div>
-                  <div className="p-5 bg-green-50 rounded-2xl">
-                    <Droplets className="w-7 h-7 text-green-500 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">Fats</p>
-                    <p className="font-bold text-xl text-green-600">25%</p>
+                  <div className="p-3 bg-green-50 rounded-2xl">
+                    <Droplets className="w-5 h-5 text-green-500 mx-auto mb-1.5" />
+                    <p className="text-xs text-gray-500">Fats</p>
+                    <p className="font-bold text-base text-green-600">25%</p>
                   </div>
                 </div>
                 {hasMealPlan && (
@@ -1411,12 +1411,12 @@ export default function MealPlanDashboard() {
                 )}
                 {/* Today's Highlight */}
                 {todaysMealPlan && viewMode === "weekly" && (
-                  <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-3xl p-8 text-white shadow-xl shadow-emerald-500/30">
+                  <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-6 text-white shadow-xl shadow-emerald-500/30">
                     <div className="flex items-center gap-4 mb-6">
                       <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                         <Zap className="w-6 h-6" />
                       </div>
-                      <h2 className="text-xl font-bold">Today&apos;s Highlights</h2>
+                      <h2 className="text-base font-bold">Today&apos;s Highlights</h2>
                     </div>
                     <div className="grid sm:grid-cols-3 gap-5">
                       <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5">
@@ -1445,13 +1445,13 @@ export default function MealPlanDashboard() {
                 )}
 
                 {/* Weekly Overview */}
-                <div ref={weeklyPlanRef} className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl shadow-gray-200/50 border border-white/50">
-                  <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-xl">
-                        <Calendar className="w-6 h-6 text-white" />
+                <div ref={weeklyPlanRef} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg shadow-gray-200/40 border border-white/50">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-xl">
+                        <Calendar className="w-5 h-5 text-white" />
                       </div>
-                      <h2 className="font-bold text-xl text-gray-800">Weekly Meal Plan</h2>
+                      <h2 className="font-bold text-base text-gray-800">Weekly Meal Plan</h2>
                     </div>
                     <button
                       onClick={() => mutation.mutate({
@@ -1463,9 +1463,9 @@ export default function MealPlanDashboard() {
                         servingCount,
                         days: 7,
                       })}
-                      className="flex items-center gap-2 px-5 py-3 text-base font-medium text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
                     >
-                      <RefreshCw className="w-5 h-5" />
+                      <RefreshCw className="w-4 h-4" />
                       Regenerate All
                     </button>
                   </div>
@@ -1491,11 +1491,11 @@ export default function MealPlanDashboard() {
 
                 {/* Weekly Analytics */}
                 <div ref={weeklyAnalyticsRef} className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-6 border border-amber-200/50 space-y-5">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-amber-100 rounded-xl">
-                      <TrendingUp className="w-6 h-6 text-amber-600" />
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-amber-100 rounded-xl">
+                      <TrendingUp className="w-5 h-5 text-amber-600" />
                     </div>
-                    <h3 className="font-bold text-lg text-amber-800">Weekly Analytics</h3>
+                    <h3 className="font-bold text-sm text-amber-800">Weekly Analytics</h3>
                   </div>
 
                   <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1557,26 +1557,26 @@ export default function MealPlanDashboard() {
                 </div>
               </div>
             ) : (
-              <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-16 shadow-xl shadow-gray-200/50 border border-white/50 text-center">
+              <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-10 shadow-xl shadow-gray-200/50 border border-white/50 text-center">
                 <div className="max-w-lg mx-auto">
-                  <div className="w-32 h-32 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-full mx-auto mb-8 flex items-center justify-center">
-                    <Utensils className="w-16 h-16 text-emerald-500" />
+                  <div className="w-24 h-24 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-full mx-auto mb-6 flex items-center justify-center">
+                    <Utensils className="w-12 h-12 text-emerald-500" />
                   </div>
-                  <h2 className="text-3xl font-bold text-gray-800 mb-4">Ready to Plan Your Week?</h2>
-                  <p className="text-gray-500 mb-8 text-lg">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-3">Ready to Plan Your Week?</h2>
+                  <p className="text-gray-500 mb-6 text-sm">
                     Set your preferences on the left and let our AI create a personalized meal plan tailored to your goals.
                   </p>
-                  <div className="flex items-center justify-center gap-8 text-base text-gray-400">
-                    <span className="flex items-center gap-2">
-                      <Check className="w-5 h-5 text-emerald-500" />
+                  <div className="flex items-center justify-center gap-6 text-sm text-gray-400">
+                    <span className="flex items-center gap-1.5">
+                      <Check className="w-4 h-4 text-emerald-500" />
                       Personalized meals
                     </span>
-                    <span className="flex items-center gap-2">
-                      <Check className="w-5 h-5 text-emerald-500" />
+                    <span className="flex items-center gap-1.5">
+                      <Check className="w-4 h-4 text-emerald-500" />
                       Balanced nutrition
                     </span>
-                    <span className="flex items-center gap-2">
-                      <Check className="w-5 h-5 text-emerald-500" />
+                    <span className="flex items-center gap-1.5">
+                      <Check className="w-4 h-4 text-emerald-500" />
                       Easy to follow
                     </span>
                   </div>
