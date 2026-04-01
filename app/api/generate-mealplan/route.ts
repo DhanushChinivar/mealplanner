@@ -538,6 +538,11 @@ export async function GET() {
       warning: latest.warning ?? undefined,
       createdAt: latest.createdAt,
       servingCount: latest.servingCount ?? 1,
+      dietType: latest.dietType ?? "",
+      calories: latest.calories ?? 2000,
+      allergies: latest.allergies ?? "",
+      cuisine: latest.cuisine ?? "",
+      snacks: latest.snacks ?? false,
     });
   } catch (error) {
     console.error("Error fetching latest meal plan:", error);
@@ -667,6 +672,15 @@ export async function POST(request: Request) {
           const { status, message } = getProviderErrorDetails(error);
           lastProviderStatus = status;
           lastProviderMessage = message;
+          console.error(
+            "OpenRouter request failed",
+            JSON.stringify({
+              model,
+              attempt,
+              status: status ?? null,
+              message,
+            })
+          );
           const hasMoreRetries = attempt < MAX_RETRIES_PER_MODEL;
 
           if (hasMoreRetries && shouldRetry(status)) {
@@ -682,6 +696,14 @@ export async function POST(request: Request) {
     }
 
     if (!aiContent) {
+      console.error(
+        "OpenRouter: all models failed",
+        JSON.stringify({
+          lastProviderStatus: lastProviderStatus ?? null,
+          lastProviderMessage,
+          modelsTried: MODELS,
+        })
+      );
       const userWarning = toUserWarning(lastProviderStatus, lastProviderMessage);
       if (userId) {
         savedPlanId = await safePersistMealPlan({
