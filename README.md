@@ -148,4 +148,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ## Contact
 
-Dhanush Chinivar — Student
+## Contact
+
+Dhanush Chinivar (mailto:dhanushchinivar@gmail.com) · [LinkedIn](https://www.linkedin.com/in/dhanush-chinivar/) · 
