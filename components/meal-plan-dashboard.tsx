@@ -1235,7 +1235,7 @@ export default function MealPlanDashboard() {
           <section className="mb-6 rounded-2xl border border-emerald-100 bg-white/75 backdrop-blur-sm px-5 py-5 sm:px-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-emerald-600">
+                <p className="text-sm font-semibold uppercase tracking-[0.15em] text-emerald-600">
                   MealsForge Dashboard
                 </p>
                 <h1 className="mt-1.5 text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-gray-900">
