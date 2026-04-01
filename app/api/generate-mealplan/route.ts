@@ -6,7 +6,16 @@ import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { parseMealToStructured } from "@/types/mealplan";
 
-const API_KEY = process.env.OPENROUTER_API_KEY ?? process.env.OPENAI_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const AI_PROVIDER =
+  (process.env.AI_PROVIDER ?? "").trim().toLowerCase() ||
+  (OPENAI_API_KEY ? "openai" : "openrouter");
+const OPENAI_MODEL = (process.env.OPENAI_MODEL ?? "gpt-4o-mini").trim();
+
+function createOpenAIClient(apiKey: string) {
+  return new OpenAI({ apiKey });
+}
 
 function createOpenRouterClient(apiKey: string) {
   return new OpenAI({
@@ -20,13 +29,16 @@ function createOpenRouterClient(apiKey: string) {
   });
 }
 
-const MODELS = (
+const OPENROUTER_MODELS = (
   process.env.OPENROUTER_MODELS ??
   "meta-llama/llama-3.2-3b-instruct:free"
 )
   .split(",")
   .map((model) => model.trim())
   .filter(Boolean);
+
+const MODELS =
+  AI_PROVIDER === "openai" ? [OPENAI_MODEL] : OPENROUTER_MODELS;
 
 const MAX_RETRIES_PER_MODEL = 2;
 const BASE_RETRY_DELAY_MS = 900;
@@ -588,7 +600,27 @@ export async function POST(request: Request) {
 
     let savedPlanId: string | null = null;
 
-    if (!API_KEY) {
+    if (AI_PROVIDER === "openai" && !OPENAI_API_KEY) {
+      if (userId) {
+        savedPlanId = await safePersistMealPlan({
+          userId,
+          input,
+          mealPlan: fallbackFinalPlan,
+          source: "fallback",
+          warning:
+            "Missing OpenAI API key. Returned a locally generated meal plan.",
+          servingCount,
+        });
+      }
+      return NextResponse.json({
+        id: savedPlanId ?? undefined,
+        mealPlan: fallbackFinalPlan,
+        source: "fallback",
+        warning:
+          "Missing OpenAI API key. Returned a locally generated meal plan.",
+      });
+    }
+    if (AI_PROVIDER === "openrouter" && !OPENROUTER_API_KEY) {
       if (userId) {
         savedPlanId = await safePersistMealPlan({
           userId,
@@ -608,7 +640,11 @@ export async function POST(request: Request) {
           "Missing OpenRouter API key. Returned a locally generated meal plan.",
       });
     }
-    const openai = createOpenRouterClient(API_KEY);
+
+    const openai =
+      AI_PROVIDER === "openai"
+        ? createOpenAIClient(OPENAI_API_KEY as string)
+        : createOpenRouterClient(OPENROUTER_API_KEY as string);
 
     const prompt = `
       You are a professional nutritionist. Create a 7-day meal plan for a household of ${normalizeServingCount(servingCount)} serving(s) following a ${dietType} diet aiming for ${calories} calories per person per day.
