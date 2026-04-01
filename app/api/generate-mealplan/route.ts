@@ -709,7 +709,7 @@ export async function POST(request: Request) {
           lastProviderStatus = status;
           lastProviderMessage = message;
           console.error(
-            `AI provider request failed (${AI_PROVIDER})`,
+            "OpenRouter request failed",
             JSON.stringify({
               model,
               attempt,
@@ -733,7 +733,7 @@ export async function POST(request: Request) {
 
     if (!aiContent) {
       console.error(
-        `AI provider: all models failed (${AI_PROVIDER})`,
+        "OpenRouter: all models failed",
         JSON.stringify({
           lastProviderStatus: lastProviderStatus ?? null,
           lastProviderMessage,
