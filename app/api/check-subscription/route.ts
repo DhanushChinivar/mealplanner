@@ -1,17 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 
 const TRIAL_DAYS = 7;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    // Use the query param
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
+    const { userId } = await auth();
 
     if (!userId) {
-      return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const profile = await prisma.profile.findUnique({
@@ -78,8 +77,8 @@ export async function GET(req: NextRequest) {
         ? "Your 7-day free trial has ended. Subscribe to continue."
         : undefined,
     });
-  } catch (err: any) {
-    console.error("check-subscription error:", err.message);
+  } catch (err: unknown) {
+    console.error("check-subscription error:", err instanceof Error ? err.message : err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

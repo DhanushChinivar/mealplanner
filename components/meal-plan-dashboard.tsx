@@ -178,199 +178,227 @@ interface MealPlanInput {
   baseMealPlan?: WeeklyMealPlan;
 }
 
-// Larger SVG Pie Chart for Macros
-const MacroPieChart = ({ protein = 30, carbs = 45, fats = 25 }: { protein?: number; carbs?: number; fats?: number }) => {
-  const total = protein + carbs + fats;
-  const proteinAngle = (protein / total) * 360;
-  const carbsAngle = (carbs / total) * 360;
-  const fatsAngle = (fats / total) * 360;
+// ── Sub-components ────────────────────────────────────────────────────────────
 
-  const getCoordinatesForPercent = (percent: number) => {
-    const x = Math.cos(2 * Math.PI * percent);
-    const y = Math.sin(2 * Math.PI * percent);
-    return [x, y];
-  };
-
-  const proteinPercent = protein / total;
-  const carbsPercent = carbs / total;
-
-  const [proteinX, proteinY] = getCoordinatesForPercent(0);
-  const [proteinEndX, proteinEndY] = getCoordinatesForPercent(proteinPercent);
-  const [carbsEndX, carbsEndY] = getCoordinatesForPercent(proteinPercent + carbsPercent);
-
-  return (
-    <div className="relative">
-      <svg viewBox="-1 -1 2 2" className="w-52 h-52 transform -rotate-90">
-        <path
-          d={`M 0 0 L ${proteinX} ${proteinY} A 1 1 0 ${proteinAngle > 180 ? 1 : 0} 1 ${proteinEndX} ${proteinEndY} Z`}
-          fill="#ef4444"
-          className="drop-shadow-md"
-        />
-        <path
-          d={`M 0 0 L ${proteinEndX} ${proteinEndY} A 1 1 0 ${carbsAngle > 180 ? 1 : 0} 1 ${carbsEndX} ${carbsEndY} Z`}
-          fill="#f59e0b"
-          className="drop-shadow-md"
-        />
-        <path
-          d={`M 0 0 L ${carbsEndX} ${carbsEndY} A 1 1 0 ${fatsAngle > 180 ? 1 : 0} 1 ${proteinX} ${proteinY} Z`}
-          fill="#22c55e"
-          className="drop-shadow-md"
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-24 h-24 bg-white rounded-full shadow-inner flex items-center justify-center">
-          <Flame className="w-8 h-8 text-orange-500" />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Calorie Progress Bar
 const CalorieProgressBar = ({ current, goal }: { current: number; goal: number }) => {
-  const percentage = Math.min((current / goal) * 100, 100);
-  
+  const pct = Math.min((current / goal) * 100, 100);
   return (
-    <div className="space-y-3">
-      <div className="flex justify-between text-sm">
-        <span className="text-gray-600 font-medium">Daily Progress</span>
+    <div className="space-y-1.5">
+      <div className="flex justify-between text-xs">
+        <span className="font-medium text-slate-500">Daily Progress</span>
         <span className="font-bold text-emerald-600">{current} / {goal} kcal</span>
       </div>
-      <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
-        <div 
-          className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-1000 ease-out"
-          style={{ width: `${percentage}%` }}
+      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-emerald-500 rounded-full transition-all duration-700 ease-out"
+          style={{ width: `${pct}%` }}
         />
       </div>
     </div>
   );
 };
 
-// Toggle Button Component
-const ToggleButton = ({ 
-  active, 
-  onClick, 
-  icon: Icon, 
-  label 
-}: { 
-  active: boolean; 
-  onClick: () => void; 
-  icon: ElementType; 
+const ToggleButton = ({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: ElementType;
   label: string;
 }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium transition-all duration-300 ${
-      active 
-        ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-105" 
-        : "bg-white/60 text-gray-600 hover:bg-white hover:shadow-md"
+    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+      active
+        ? "bg-emerald-600 text-white shadow-sm"
+        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
     }`}
   >
-    <Icon className="w-4 h-4" />
+    <Icon className="w-3.5 h-3.5" />
     {label}
   </button>
 );
 
-// Meal Card Component
-const MealCard = ({ 
-  type, 
-  meal, 
-  icon: Icon, 
-  gradient,
+const mealTypeAccent: Record<
+  string,
+  { border: string; iconBg: string; iconColor: string; doneBg: string }
+> = {
+  Breakfast: {
+    border: "border-l-amber-400",
+    iconBg: "bg-amber-50",
+    iconColor: "text-amber-500",
+    doneBg: "bg-amber-50/70",
+  },
+  Lunch: {
+    border: "border-l-emerald-400",
+    iconBg: "bg-emerald-50",
+    iconColor: "text-emerald-600",
+    doneBg: "bg-emerald-50/70",
+  },
+  Dinner: {
+    border: "border-l-indigo-400",
+    iconBg: "bg-indigo-50",
+    iconColor: "text-indigo-500",
+    doneBg: "bg-indigo-50/50",
+  },
+  Snacks: {
+    border: "border-l-rose-400",
+    iconBg: "bg-rose-50",
+    iconColor: "text-rose-500",
+    doneBg: "bg-rose-50/50",
+  },
+};
+
+const MealCard = ({
+  type,
+  meal,
+  icon: Icon,
   onRegenerate,
   mealStatus,
   onSetStatus,
-}: { 
-  type: string; 
-  meal?: string; 
-  icon: ElementType; 
-  gradient: string;
+}: {
+  type: string;
+  meal?: string;
+  icon: ElementType;
+  gradient?: string;
   onRegenerate?: () => void;
   mealStatus?: "completed" | "skipped";
   onSetStatus?: (status: "completed" | "skipped" | "pending") => void;
 }) => {
-  const estimatedCalories = meal ? Math.floor(300 + Math.random() * 400) : 0;
-  const prepTime = meal ? Math.floor(15 + Math.random() * 30) : 0;
+  const caloriesByType: Record<string, number> = {
+    Breakfast: 400,
+    Lunch: 550,
+    Dinner: 650,
+    Snacks: 200,
+  };
+  const prepByType: Record<string, number> = {
+    Breakfast: 15,
+    Lunch: 20,
+    Dinner: 30,
+    Snacks: 10,
+  };
+  const accent = mealTypeAccent[type] ?? {
+    border: "border-l-slate-300",
+    iconBg: "bg-slate-50",
+    iconColor: "text-slate-400",
+    doneBg: "bg-slate-50",
+  };
 
   return (
-    <div className="group relative bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-white/50">
-      <div className={`absolute inset-0 ${gradient} opacity-0 group-hover:opacity-5 rounded-2xl transition-opacity duration-300`} />
-      
-      <div className="relative">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className={`p-2 rounded-xl ${gradient} bg-opacity-10`}>
-              <Icon className="w-4 h-4 text-emerald-600" />
-            </div>
-            <h4 className="font-semibold text-gray-800 text-sm">{type}</h4>
-          </div>
-          <div className="flex items-center gap-2">
-            {meal && onSetStatus && (
-              <>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onSetStatus(mealStatus === "completed" ? "pending" : "completed")
-                  }
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                    mealStatus === "completed"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {mealStatus === "completed" ? "Completed" : "Mark done"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onSetStatus(mealStatus === "skipped" ? "pending" : "skipped")
-                  }
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                    mealStatus === "skipped"
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {mealStatus === "skipped" ? "Skipped" : "Skip"}
-                </button>
-              </>
-            )}
-            {meal && onRegenerate && (
-              <button 
-                onClick={onRegenerate}
-                className="opacity-0 group-hover:opacity-100 p-2 hover:bg-gray-100 rounded-lg transition-all duration-300"
-                title="Regenerate this meal"
-              >
-                <RefreshCw className="w-5 h-5 text-gray-400 hover:text-emerald-500" />
-              </button>
-            )}
-          </div>
+    <div
+      className={`group relative rounded-xl border border-l-4 ${accent.border} p-3.5 transition-all duration-200 ${
+        mealStatus === "completed"
+          ? `${accent.doneBg} border-slate-100`
+          : mealStatus === "skipped"
+          ? "bg-slate-50 border-slate-100 opacity-60"
+          : "bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className={`p-1.5 rounded-lg ${accent.iconBg} shrink-0 mt-0.5`}>
+          <Icon className={`w-3.5 h-3.5 ${accent.iconColor}`} />
         </div>
-        
-        {meal ? (
-          <>
-            <p className="text-gray-700 mb-3 text-sm leading-relaxed">{meal}</p>
-            <div className="flex items-center gap-4 text-xs text-gray-500">
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                {type}
+              </span>
+              {mealStatus === "completed" && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">
+                  <Check className="w-2.5 h-2.5" /> Done
+                </span>
+              )}
+              {mealStatus === "skipped" && (
+                <span className="text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded font-bold">
+                  Skipped
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              {meal && onSetStatus && (
+                <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onSetStatus(mealStatus === "completed" ? "pending" : "completed")
+                    }
+                    title="Mark complete"
+                    className={`px-2 py-1.5 text-xs font-bold transition-colors ${
+                      mealStatus === "completed"
+                        ? "bg-emerald-500 text-white"
+                        : "bg-white text-slate-400 hover:bg-emerald-50 hover:text-emerald-600"
+                    }`}
+                  >
+                    ✓
+                  </button>
+                  <div className="w-px bg-slate-200" />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onSetStatus(mealStatus === "skipped" ? "pending" : "skipped")
+                    }
+                    title="Skip meal"
+                    className={`px-2 py-1.5 text-xs font-bold transition-colors ${
+                      mealStatus === "skipped"
+                        ? "bg-slate-400 text-white"
+                        : "bg-white text-slate-400 hover:bg-slate-100"
+                    }`}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              {meal && onRegenerate && (
+                <button
+                  onClick={onRegenerate}
+                  title="Swap this meal"
+                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-slate-100 rounded-lg transition-all text-slate-400 hover:text-emerald-600"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {meal ? (
+            <p
+              className={`text-sm font-medium mt-1 leading-relaxed ${
+                mealStatus === "skipped"
+                  ? "line-through text-slate-400"
+                  : "text-slate-700"
+              }`}
+            >
+              {meal}
+            </p>
+          ) : (
+            <p className="text-sm text-slate-400 italic mt-1">No meal planned</p>
+          )}
+
+          {meal && (
+            <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
               <span className="flex items-center gap-1">
-                <Flame className="w-3.5 h-3.5 text-orange-400" />
-                ~{estimatedCalories} kcal
+                <Flame className="w-3 h-3 text-orange-400" />~
+                {caloriesByType[type] ?? 450} kcal
               </span>
               <span className="flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-blue-400" />
-                {prepTime} min
+                <Clock className="w-3 h-3 text-blue-400" />
+                {prepByType[type] ?? 20} min
               </span>
             </div>
-          </>
-        ) : (
-          <p className="text-gray-400 italic text-sm">No meal planned</p>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
-// AI Loading Animation
 const AILoadingAnimation = ({ isGenerating = true }: { isGenerating?: boolean }) => {
   const [tipIndex, setTipIndex] = useState(0);
   const tips = [
@@ -383,44 +411,43 @@ const AILoadingAnimation = ({ isGenerating = true }: { isGenerating?: boolean })
 
   useEffect(() => {
     if (!isGenerating) return;
-    const interval = setInterval(() => {
-      setTipIndex((prev) => (prev + 1) % tips.length);
-    }, 2000);
+    const interval = setInterval(
+      () => setTipIndex((p) => (p + 1) % tips.length),
+      2000
+    );
     return () => clearInterval(interval);
   }, [tips.length, isGenerating]);
 
   if (!isGenerating) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 space-y-5">
-        <Loader2 className="w-12 h-12 text-emerald-500 animate-spin" />
-        <p className="text-gray-500 font-medium">Loading your planner...</p>
+      <div className="flex flex-col items-center justify-center py-32 gap-4">
+        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        <p className="text-sm text-slate-500 font-medium">Loading your planner...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center py-24 space-y-10">
+    <div className="flex flex-col items-center justify-center py-24 gap-8">
       <div className="relative">
-        <div className="w-32 h-32 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 animate-pulse flex items-center justify-center">
-          <ChefHat className="w-16 h-16 text-white" />
+        <div className="w-24 h-24 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-600/30">
+          <ChefHat className="w-12 h-12 text-white" />
         </div>
-        <div className="absolute -inset-6 rounded-full border-4 border-emerald-200 animate-spin border-t-emerald-500" />
-        <Sparkles className="absolute -top-3 -right-3 w-8 h-8 text-yellow-400 animate-bounce" />
+        <div className="absolute -inset-3 rounded-2xl border-2 border-emerald-200 animate-spin border-t-emerald-500" />
+        <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-amber-400 animate-bounce" />
       </div>
-      
-      <div className="text-center space-y-3">
-        <h3 className="text-xl font-semibold text-gray-800">AI Chef at Work</h3>
-        <p className="text-emerald-600 animate-pulse transition-all duration-500 text-base">
+      <div className="text-center space-y-2">
+        <h3 className="text-lg font-bold text-slate-800">AI Chef at Work</h3>
+        <p className="text-sm text-emerald-600 animate-pulse transition-all duration-500">
           {tips[tipIndex]}
         </p>
       </div>
-      
-      <div className="flex gap-3">
+      <div className="flex gap-2">
         {[0, 1, 2].map((i) => (
           <div
             key={i}
-            className="w-4 h-4 rounded-full bg-emerald-500 animate-bounce"
-            style={{ animationDelay: `${i * 0.15}s` }}
+            className="w-2 h-2 rounded-full bg-emerald-500 animate-bounce"
+            style={{ animationDelay: `${i * 150}ms` }}
           />
         ))}
       </div>
@@ -428,19 +455,18 @@ const AILoadingAnimation = ({ isGenerating = true }: { isGenerating?: boolean })
   );
 };
 
-// Day Card Component
-const DayCard = ({ 
-  day, 
-  mealPlan, 
-  isToday, 
-  isExpanded, 
+const DayCard = ({
+  day,
+  mealPlan,
+  isToday,
+  isExpanded,
   onToggle,
   mealStatuses,
   onSetMealStatus,
   onSwapMeal,
-}: { 
-  day: string; 
-  mealPlan?: DailyMealPlan; 
+}: {
+  day: string;
+  mealPlan?: DailyMealPlan;
   isToday: boolean;
   isExpanded: boolean;
   onToggle: () => void;
@@ -455,95 +481,160 @@ const DayCard = ({
     status: "completed" | "skipped" | "pending"
   ) => void;
   onSwapMeal?: (mealType: MealTypeKey) => void;
-}) => (
-  <div 
-    className={`bg-white/80 backdrop-blur-sm rounded-2xl overflow-hidden transition-all duration-300 border ${
-      isToday ? "border-emerald-300 shadow-lg shadow-emerald-100" : "border-white/50 shadow-sm hover:shadow-md"
-    }`}
-  >
-    <button
-      onClick={onToggle}
-      className="w-full p-5 flex items-center justify-between hover:bg-gray-50/50 transition-colors"
+}) => {
+  const mealKeys: MealTypeKey[] = ["breakfast", "lunch", "dinner", "snacks"];
+
+  const slotColors: Record<string, string> = {
+    breakfast:
+      mealStatuses?.breakfast === "completed"
+        ? "bg-amber-400"
+        : mealStatuses?.breakfast === "skipped"
+        ? "bg-slate-200"
+        : "bg-amber-200",
+    lunch:
+      mealStatuses?.lunch === "completed"
+        ? "bg-emerald-500"
+        : mealStatuses?.lunch === "skipped"
+        ? "bg-slate-200"
+        : "bg-emerald-200",
+    dinner:
+      mealStatuses?.dinner === "completed"
+        ? "bg-indigo-500"
+        : mealStatuses?.dinner === "skipped"
+        ? "bg-slate-200"
+        : "bg-indigo-200",
+    snacks:
+      mealStatuses?.snacks === "completed"
+        ? "bg-rose-400"
+        : mealStatuses?.snacks === "skipped"
+        ? "bg-slate-200"
+        : "bg-rose-200",
+  };
+
+  const completedCount = mealKeys.filter(
+    (k) => mealStatuses?.[k] === "completed"
+  ).length;
+  const totalMeals = mealPlan
+    ? mealKeys.filter((k) => mealPlan[k]).length
+    : 0;
+
+  return (
+    <div
+      className={`rounded-xl overflow-hidden border transition-all ${
+        isToday
+          ? "border-emerald-200 shadow-sm shadow-emerald-100/60"
+          : "border-slate-200"
+      } bg-white`}
     >
-      <div className="flex items-center gap-4">
-        <div className={`p-3 rounded-xl ${isToday ? "bg-emerald-100" : "bg-gray-100"}`}>
-          <Calendar className={`w-6 h-6 ${isToday ? "text-emerald-600" : "text-gray-500"}`} />
+      <button
+        onClick={onToggle}
+        className={`w-full px-4 py-3.5 flex items-center justify-between transition-colors ${
+          isToday ? "hover:bg-emerald-50/40" : "hover:bg-slate-50/70"
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className={`w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-black shrink-0 ${
+              isToday
+                ? "bg-emerald-600 text-white"
+                : "bg-slate-100 text-slate-500"
+            }`}
+          >
+            {day.slice(0, 3).toUpperCase()}
+          </div>
+          <div className="text-left">
+            <div className="flex items-center gap-2">
+              <span
+                className={`font-semibold text-sm ${
+                  isToday ? "text-emerald-700" : "text-slate-800"
+                }`}
+              >
+                {day}
+              </span>
+              {isToday && (
+                <span className="text-[11px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">
+                  Today
+                </span>
+              )}
+              {completedCount > 0 && !isExpanded && (
+                <span className="text-[11px] text-emerald-600 font-semibold">
+                  {completedCount}/{totalMeals} done
+                </span>
+              )}
+            </div>
+            {mealPlan && !isExpanded && (
+              <div className="flex items-center gap-1 mt-1.5">
+                {mealKeys
+                  .filter((k) => mealPlan[k])
+                  .map((k) => (
+                    <span
+                      key={k}
+                      title={k}
+                      className={`w-5 h-1 rounded-full ${slotColors[k]} transition-colors`}
+                    />
+                  ))}
+              </div>
+            )}
+          </div>
         </div>
-        <div className="text-left">
-          <h3 className={`font-semibold text-base ${isToday ? "text-emerald-700" : "text-gray-800"}`}>
-            {day}
-            {isToday && <span className="ml-2 text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full">Today</span>}
-          </h3>
-          {mealPlan && !isExpanded && (
-            <p className="text-sm text-gray-500 truncate max-w-xs mt-1">
-              {mealPlan.breakfast?.split(',')[0]}...
-            </p>
-          )}
-        </div>
-      </div>
-      <ChevronDown className={`w-6 h-6 text-gray-400 transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`} />
-    </button>
-    
-    {isExpanded && mealPlan && (
-      <div className="px-5 pb-5 grid gap-4 animate-in slide-in-from-top-2 duration-300">
-        <MealCard
-          type="Breakfast"
-          meal={mealPlan.breakfast}
-          icon={Coffee}
-          gradient="bg-gradient-to-br from-amber-400 to-orange-500"
-          onRegenerate={onSwapMeal ? () => onSwapMeal("breakfast") : undefined}
-          mealStatus={mealStatuses?.breakfast}
-          onSetStatus={
-            onSetMealStatus
-              ? (status) => onSetMealStatus("breakfast", status)
-              : undefined
-          }
+        <ChevronDown
+          className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+            isExpanded ? "rotate-180" : ""
+          }`}
         />
-        <MealCard
-          type="Lunch"
-          meal={mealPlan.lunch}
-          icon={Sun}
-          gradient="bg-gradient-to-br from-emerald-400 to-teal-500"
-          onRegenerate={onSwapMeal ? () => onSwapMeal("lunch") : undefined}
-          mealStatus={mealStatuses?.lunch}
-          onSetStatus={
-            onSetMealStatus
-              ? (status) => onSetMealStatus("lunch", status)
-              : undefined
-          }
-        />
-        <MealCard
-          type="Dinner"
-          meal={mealPlan.dinner}
-          icon={Moon}
-          gradient="bg-gradient-to-br from-indigo-400 to-purple-500"
-          onRegenerate={onSwapMeal ? () => onSwapMeal("dinner") : undefined}
-          mealStatus={mealStatuses?.dinner}
-          onSetStatus={
-            onSetMealStatus
-              ? (status) => onSetMealStatus("dinner", status)
-              : undefined
-          }
-        />
-        {mealPlan.snacks && (
+      </button>
+
+      {isExpanded && mealPlan && (
+        <div className="border-t border-slate-100 px-4 pb-4 pt-3 space-y-2.5 animate-in slide-in-from-top-1 duration-200">
           <MealCard
-            type="Snacks"
-            meal={mealPlan.snacks}
-            icon={Cookie}
-            gradient="bg-gradient-to-br from-pink-400 to-rose-500"
-            onRegenerate={onSwapMeal ? () => onSwapMeal("snacks") : undefined}
-            mealStatus={mealStatuses?.snacks}
+            type="Breakfast"
+            meal={mealPlan.breakfast}
+            icon={Coffee}
+            onRegenerate={onSwapMeal ? () => onSwapMeal("breakfast") : undefined}
+            mealStatus={mealStatuses?.breakfast}
             onSetStatus={
-              onSetMealStatus
-                ? (status) => onSetMealStatus("snacks", status)
-                : undefined
+              onSetMealStatus ? (s) => onSetMealStatus("breakfast", s) : undefined
             }
           />
-        )}
-      </div>
-    )}
-  </div>
-);
+          <MealCard
+            type="Lunch"
+            meal={mealPlan.lunch}
+            icon={Sun}
+            onRegenerate={onSwapMeal ? () => onSwapMeal("lunch") : undefined}
+            mealStatus={mealStatuses?.lunch}
+            onSetStatus={
+              onSetMealStatus ? (s) => onSetMealStatus("lunch", s) : undefined
+            }
+          />
+          <MealCard
+            type="Dinner"
+            meal={mealPlan.dinner}
+            icon={Moon}
+            onRegenerate={onSwapMeal ? () => onSwapMeal("dinner") : undefined}
+            mealStatus={mealStatuses?.dinner}
+            onSetStatus={
+              onSetMealStatus ? (s) => onSetMealStatus("dinner", s) : undefined
+            }
+          />
+          {mealPlan.snacks && (
+            <MealCard
+              type="Snacks"
+              meal={mealPlan.snacks}
+              icon={Cookie}
+              onRegenerate={onSwapMeal ? () => onSwapMeal("snacks") : undefined}
+              mealStatus={mealStatuses?.snacks}
+              onSetStatus={
+                onSetMealStatus ? (s) => onSetMealStatus("snacks", s) : undefined
+              }
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function MealPlanDashboard() {
   const { user } = useUser();
@@ -562,16 +653,17 @@ export default function MealPlanDashboard() {
   const [isVegetarian, setIsVegetarian] = useState(false);
   const [isHighProtein, setIsHighProtein] = useState(false);
   const [isLowCarb, setIsLowCarb] = useState(false);
-  const [selectedPlanData, setSelectedPlanData] = useState<MealPlanResponse | null>(null);
+  const [selectedPlanData, setSelectedPlanData] = useState<MealPlanResponse | null>(
+    null
+  );
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<MealPlanHistoryItem[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
   const [groceryWarning, setGroceryWarning] = useState<string | null>(null);
   const [isGroceryLoading, setIsGroceryLoading] = useState(false);
-  const [progressSummary, setProgressSummary] = useState<MealProgressResponse | null>(
-    null
-  );
+  const [progressSummary, setProgressSummary] =
+    useState<MealProgressResponse | null>(null);
   const [isProgressLoading, setIsProgressLoading] = useState(false);
   const [isLoadingInitialPlan, setIsLoadingInitialPlan] = useState(true);
   const [mealStatuses, setMealStatuses] = useState<
@@ -579,12 +671,7 @@ export default function MealPlanDashboard() {
   >({});
   const [adherenceSummary, setAdherenceSummary] = useState<
     NonNullable<MealLogResponse["summary"]>
-  >({
-    totalMeals: 0,
-    completedMeals: 0,
-    skippedMeals: 0,
-    adherence: 0,
-  });
+  >({ totalMeals: 0, completedMeals: 0, skippedMeals: 0, adherence: 0 });
   const [analyticsSummary, setAnalyticsSummary] = useState<
     NonNullable<MealAnalyticsResponse["summary"]>
   >({
@@ -605,9 +692,11 @@ export default function MealPlanDashboard() {
   const [activePlannerSection, setActivePlannerSection] = useState<
     "plan" | "analytics"
   >("plan");
+  const [pendingScrollSection, setPendingScrollSection] = useState<
+    "plan" | "analytics" | null
+  >(null);
   const weeklyPlanRef = useRef<HTMLDivElement | null>(null);
   const weeklyAnalyticsRef = useRef<HTMLDivElement | null>(null);
-
   const [isDeleting, setIsDeleting] = useState(false);
 
   const loadFormFromPlan = (plan: MealPlanResponse | null) => {
@@ -625,11 +714,15 @@ export default function MealPlanDashboard() {
   };
 
   const handleDeletePlan = async () => {
+    if (
+      !confirm(
+        "Are you sure you want to delete ALL meal plans? This cannot be undone."
+      )
+    )
+      return;
     try {
       setIsDeleting(true);
-      const res = await fetch(`/api/mealplans?planId=all`, {
-        method: "DELETE"
-      });
+      const res = await fetch(`/api/mealplans?planId=all`, { method: "DELETE" });
       if (res.ok) {
         setSelectedPlanData(null);
         setSelectedPlanId(null);
@@ -652,10 +745,7 @@ export default function MealPlanDashboard() {
   const fetchTrialStatus = async () => {
     if (!user?.id) return;
     try {
-      const response = await fetch(
-        `/api/check-subscription?userId=${encodeURIComponent(user.id)}`,
-        { method: "GET" }
-      );
+      const response = await fetch(`/api/check-subscription`, { method: "GET" });
       if (!response.ok) return;
       const data: TrialStatusResponse = await response.json();
       setIsOnTrial(Boolean(data.onTrial));
@@ -674,10 +764,10 @@ export default function MealPlanDashboard() {
       const finalPlanId = planId ?? selectedPlanId;
       if (finalPlanId) params.set("planId", finalPlanId);
       const query = params.toString();
-      const response = await fetch(`/api/meal-analytics${query ? `?${query}` : ""}`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await fetch(
+        `/api/meal-analytics${query ? `?${query}` : ""}`,
+        { method: "GET", headers: { "Content-Type": "application/json" } }
+      );
       if (!response.ok) return;
       const data: MealAnalyticsResponse = await response.json();
       setAnalyticsSummary(
@@ -703,10 +793,10 @@ export default function MealPlanDashboard() {
       const finalPlanId = planId ?? selectedPlanId;
       if (finalPlanId) params.set("planId", finalPlanId);
       const query = params.toString();
-      const response = await fetch(`/api/meal-log${query ? `?${query}` : ""}`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await fetch(
+        `/api/meal-log${query ? `?${query}` : ""}`,
+        { method: "GET", headers: { "Content-Type": "application/json" } }
+      );
       if (!response.ok) return;
       const data: MealLogResponse = await response.json();
       setMealStatuses(data.statuses ?? {});
@@ -743,10 +833,10 @@ export default function MealPlanDashboard() {
   const loadHistoryPlan = async (planId: string) => {
     try {
       setIsHistoryLoading(true);
-      const response = await fetch(`/api/mealplans?planId=${encodeURIComponent(planId)}`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await fetch(
+        `/api/mealplans?planId=${encodeURIComponent(planId)}`,
+        { method: "GET", headers: { "Content-Type": "application/json" } }
+      );
       if (!response.ok) return;
       const data: MealPlanHistoryResponse = await response.json();
       if (data.selected) {
@@ -774,8 +864,11 @@ export default function MealPlanDashboard() {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
+      if (!response.ok) {
+        console.error("Grocery list fetch failed:", response.status);
+        return;
+      }
       const data: GroceryListResponse = await response.json();
-      if (!response.ok) return;
       setGroceryItems(data.items ?? []);
       setGroceryWarning(data.warning ?? null);
     } catch (error) {
@@ -788,12 +881,15 @@ export default function MealPlanDashboard() {
   const handleDownloadGroceryPdf = () => {
     if (groceryItems.length === 0) return;
 
-    const grouped = groceryItems.reduce<Record<string, GroceryItem[]>>((acc, item) => {
-      const key = item.category || "other";
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(item);
-      return acc;
-    }, {});
+    const grouped = groceryItems.reduce<Record<string, GroceryItem[]>>(
+      (acc, item) => {
+        const key = item.category || "other";
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(item);
+        return acc;
+      },
+      {}
+    );
 
     const categoryLabels: Record<string, string> = {
       proteins: "Proteins",
@@ -805,56 +901,35 @@ export default function MealPlanDashboard() {
     };
 
     const sectionHtml = Object.entries(grouped)
-      .map(([category, items]) => {
-        const itemRows = items
-          .map(
-            (item) =>
-              `<li><span>${item.name}</span><span>${item.totalAmount} ${item.unit}</span></li>`
-          )
-          .join("");
-
-        return `
-          <section>
-            <h2>${categoryLabels[category] ?? category}</h2>
-            <ul>${itemRows}</ul>
-          </section>
-        `;
-      })
+      .map(
+        ([category, items]) => `
+        <section>
+          <h2>${categoryLabels[category] ?? category}</h2>
+          <ul>${items
+            .map(
+              (item) =>
+                `<li><span>${item.name}</span><span>${item.totalAmount} ${item.unit}</span></li>`
+            )
+            .join("")}</ul>
+        </section>`
+      )
       .join("");
 
     const createdAt = new Date().toLocaleString();
-    const html = `
-      <!doctype html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>MealsForge Grocery List</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
-            h1 { margin: 0 0 6px; color: #047857; }
-            p.meta { margin: 0 0 16px; color: #475569; font-size: 12px; }
-            section { margin: 14px 0; padding: 12px; border: 1px solid #d1fae5; border-radius: 10px; }
-            h2 { margin: 0 0 8px; font-size: 16px; color: #065f46; }
-            ul { list-style: none; margin: 0; padding: 0; }
-            li { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
-            li:last-child { border-bottom: none; }
-          </style>
-        </head>
-        <body>
-          <h1>MealsForge Grocery List</h1>
-          <p class="meta">Generated: ${createdAt} • Servings: ${servingCount}</p>
-          ${sectionHtml}
-        </body>
-      </html>
-    `;
+    const html = `<!doctype html><html><head><meta charset="utf-8" /><title>MealsForge Grocery List</title>
+      <style>body{font-family:Arial,sans-serif;margin:24px;color:#0f172a;}h1{margin:0 0 6px;color:#047857;}
+      p.meta{margin:0 0 16px;color:#475569;font-size:12px;}section{margin:14px 0;padding:12px;border:1px solid #d1fae5;border-radius:10px;}
+      h2{margin:0 0 8px;font-size:16px;color:#065f46;}ul{list-style:none;margin:0;padding:0;}
+      li{display:flex;justify-content:space-between;gap:16px;padding:6px 0;border-bottom:1px solid #e5e7eb;font-size:13px;}
+      li:last-child{border-bottom:none;}</style></head>
+      <body><h1>MealsForge Grocery List</h1>
+      <p class="meta">Generated: ${createdAt} • Servings: ${servingCount}</p>${sectionHtml}</body></html>`;
 
     const popup = window.open("", "_blank");
     if (!popup) return;
-
     popup.document.open();
     popup.document.write(html);
     popup.document.close();
-
     popup.onload = () => {
       popup.focus();
       popup.print();
@@ -880,14 +955,12 @@ export default function MealPlanDashboard() {
 
   useEffect(() => {
     let isMounted = true;
-
     const fetchLatestPlan = async () => {
       try {
         const response = await fetch("/api/generate-mealplan", {
           method: "GET",
           headers: { "Content-Type": "application/json" },
         });
-
         if (!response.ok) return;
         const data: MealPlanResponse = await response.json();
         if (!isMounted) return;
@@ -902,9 +975,7 @@ export default function MealPlanDashboard() {
         if (isMounted) setIsLoadingInitialPlan(false);
       }
     };
-
     fetchLatestPlan();
-
     return () => {
       isMounted = false;
     };
@@ -917,12 +988,10 @@ export default function MealPlanDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
       if (!response.ok) {
         const errorData: MealPlanResponse = await response.json();
         throw new Error(errorData.error || "Failed to generate meal plan.");
       }
-
       return response.json();
     },
     onSuccess: async (data) => {
@@ -937,15 +1006,13 @@ export default function MealPlanDashboard() {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-
     const dietTypes = [];
     if (isVegetarian) dietTypes.push("Vegetarian");
     if (isHighProtein) dietTypes.push("High-Protein");
     if (isLowCarb) dietTypes.push("Low-Carb");
     const finalDietType =
       dietTypes.length > 0 ? dietTypes.join(", ") : dietType || "Balanced";
-
-    const payload: MealPlanInput = {
+    mutation.mutate({
       dietType: finalDietType,
       calories,
       allergies,
@@ -953,12 +1020,18 @@ export default function MealPlanDashboard() {
       snacks,
       days: 7,
       servingCount,
-    };
-
-    mutation.mutate(payload);
+    });
   };
 
-  const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const daysOfWeek = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
   const today = daysOfWeek[new Date().getDay()];
   const activePlanData = selectedPlanData;
   const hasMealPlan = Boolean(activePlanData?.mealPlan);
@@ -967,20 +1040,20 @@ export default function MealPlanDashboard() {
     if (!hasMealPlan) return;
     fetchMealLogs(selectedPlanId ?? undefined);
     fetchMealAnalytics(selectedPlanId ?? undefined);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMealPlan, selectedPlanId]);
 
   useEffect(() => {
     fetchTrialStatus();
     fetchMealHistory();
     fetchProgressSummary();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   useEffect(() => {
     if (activeTab !== "grocery") return;
     fetchGrocerySync();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedPlanId, servingCount, hasMealPlan]);
 
   useEffect(() => {
@@ -991,20 +1064,30 @@ export default function MealPlanDashboard() {
           .filter((e) => e.isIntersecting)
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
         if (!visible) return;
-        if (visible.target === weeklyPlanRef.current) {
+        if (visible.target === weeklyPlanRef.current)
           setActivePlannerSection("plan");
-        }
-        if (visible.target === weeklyAnalyticsRef.current) {
+        if (visible.target === weeklyAnalyticsRef.current)
           setActivePlannerSection("analytics");
-        }
       },
       { threshold: [0.3, 0.5, 0.7] }
     );
-
     if (weeklyPlanRef.current) observer.observe(weeklyPlanRef.current);
     if (weeklyAnalyticsRef.current) observer.observe(weeklyAnalyticsRef.current);
     return () => observer.disconnect();
   }, [activeTab, hasMealPlan]);
+
+  useEffect(() => {
+    if (activeTab !== "planner" || !pendingScrollSection) return;
+    if (pendingScrollSection === "plan") {
+      weeklyPlanRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      weeklyAnalyticsRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+    setPendingScrollSection(null);
+  }, [activeTab, pendingScrollSection]);
 
   const normalizeMeals = (plan?: DailyMealPlan): DailyMealPlan | undefined => {
     if (!plan) return undefined;
@@ -1012,7 +1095,6 @@ export default function MealPlanDashboard() {
     const lunch = plan.lunch ?? plan.Lunch;
     const dinner = plan.dinner ?? plan.Dinner;
     const snacksValue = plan.snacks ?? plan.Snacks;
-
     if (!breakfast && !lunch && !dinner && !snacksValue) return undefined;
     return { breakfast, lunch, dinner, snacks: snacksValue };
   };
@@ -1039,12 +1121,7 @@ export default function MealPlanDashboard() {
       const response = await fetch("/api/meal-log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dayName,
-          mealType,
-          status,
-          planId: selectedPlanId,
-        }),
+        body: JSON.stringify({ dayName, mealType, status, planId: selectedPlanId }),
       });
       if (!response.ok) return;
       const data: MealLogResponse = await response.json();
@@ -1065,14 +1142,12 @@ export default function MealPlanDashboard() {
 
   const handleSwapMeal = (dayName: string, mealType: MealTypeKey) => {
     if (!activePlanData?.mealPlan) return;
-
     const dietTypes = [];
     if (isVegetarian) dietTypes.push("Vegetarian");
     if (isHighProtein) dietTypes.push("High-Protein");
     if (isLowCarb) dietTypes.push("Low-Carb");
     const finalDietType =
       dietTypes.length > 0 ? dietTypes.join(", ") : dietType || "Balanced";
-
     mutation.mutate({
       dietType: finalDietType,
       calories,
@@ -1090,809 +1165,1111 @@ export default function MealPlanDashboard() {
   const todaysMealPlan = getMealPlanForDay(today);
   const selectedHistoryItem = historyItems.find((item) => item.id === selectedPlanId);
   const currentProgressCalories = Math.round(calories * 0.75);
+
   const scrollToPlannerSection = (section: "plan" | "analytics") => {
     setActivePlannerSection(section);
     if (activeTab !== "planner") {
       setActiveTab("planner");
-      setTimeout(() => {
-        if (section === "plan") {
-          weeklyPlanRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-          return;
-        }
-        weeklyAnalyticsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 120);
+      setPendingScrollSection(section);
       return;
     }
-
     if (section === "plan") {
       weeklyPlanRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      return;
+    } else {
+      weeklyAnalyticsRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     }
-    weeklyAnalyticsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────────
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-[#f9fffc] to-teal-50 pt-[104px]">
+    <div className="min-h-screen bg-slate-50 pt-[104px]">
       <main className="w-full px-4 sm:px-6 lg:px-8 2xl:px-12 py-6 sm:py-8">
+
+        {/* Trial Banner */}
         {isOnTrial && (
-          <div className="mb-6 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-5 py-4">
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm sm:text-base font-semibold text-emerald-800">
-                  Free Trial Active: {trialRemainingDays ?? 0} day
-                  {(trialRemainingDays ?? 0) === 1 ? "" : "s"} remaining.
+                <p className="text-sm font-bold text-amber-900">
+                  Free Trial Active —{" "}
+                  {trialRemainingDays ?? 0} day
+                  {(trialRemainingDays ?? 0) === 1 ? "" : "s"} remaining
                 </p>
-                <p className="text-sm text-emerald-700 mt-1">
+                <p className="text-xs text-amber-700 mt-0.5">
                   {trialMessage || "After 7 days, subscribe to keep full access."}
                 </p>
               </div>
               <Link
                 href="/subscribe"
-                className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                className="inline-flex items-center justify-center rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700 transition whitespace-nowrap"
               >
-                Upgrade Plan
+                Upgrade Plan →
               </Link>
-            </div>
-          </div>
-        )}
-        {/* View Mode Toggle - Only show when meal plan exists */}
-        {hasMealPlan && (
-          <div className="flex justify-end mb-6">
-            <div className="flex items-center gap-2 bg-white/80 rounded-xl p-1 shadow-sm">
-              <button
-                onClick={() => setViewMode("daily")}
-                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                  viewMode === "daily" ? "bg-emerald-100 text-emerald-700" : "text-gray-500 hover:bg-gray-100"
-                }`}
-              >
-                Daily
-              </button>
-              <button
-                onClick={() => setViewMode("weekly")}
-                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                  viewMode === "weekly" ? "bg-emerald-100 text-emerald-700" : "text-gray-500 hover:bg-gray-100"
-                }`}
-              >
-                Weekly
-              </button>
             </div>
           </div>
         )}
 
         <div className="relative">
+          {/* ── Sidebar Navigation ── */}
           <aside
-            className={`mt-3 mb-6 w-full xl:mb-0 xl:mt-0 xl:w-64 xl:fixed xl:left-6 2xl:left-10 xl:z-30 ${
+            className={`mt-3 mb-6 w-full xl:mb-0 xl:mt-0 xl:w-60 xl:fixed xl:left-6 2xl:left-10 xl:z-30 ${
               isOnTrial ? "xl:top-[205px]" : "xl:top-[155px]"
             }`}
           >
-            <div className="rounded-2xl border border-emerald-100 bg-white/90 p-3 shadow-sm">
-              <button
-                type="button"
-                onClick={() => setActiveTab("planner")}
-                className={`mb-2 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
-                  activeTab === "planner"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <LayoutPanelLeft className="h-4 w-4" />
-                Planner
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("history")}
-                className={`mb-2 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
-                  activeTab === "history"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <History className="h-4 w-4" />
-                History
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("grocery")}
-                className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
-                  activeTab === "grocery"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                <ShoppingCart className="h-4 w-4" />
-                Grocery Sync
-              </button>
+            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              {(
+                [
+                  { id: "planner", label: "Planner", icon: LayoutPanelLeft },
+                  { id: "history", label: "History", icon: History },
+                  { id: "grocery", label: "Grocery Sync", icon: ShoppingCart },
+                ] as const
+              ).map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setActiveTab(id)}
+                  className={`relative w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors border-b border-slate-100 last:border-0 ${
+                    activeTab === id
+                      ? "bg-emerald-50 text-emerald-700 font-semibold"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+                  }`}
+                >
+                  {activeTab === id && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-emerald-500 rounded-r" />
+                  )}
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {label}
+                </button>
+              ))}
+
               {activeTab === "planner" && (
-                <div className="mt-2 border-t border-emerald-100 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => scrollToPlannerSection("plan")}
-                    className={`mb-1 w-full rounded-lg px-3 py-2 text-left text-xs font-semibold transition ${
-                      activePlannerSection === "plan"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "text-emerald-700 hover:bg-emerald-50"
-                    }`}
-                  >
-                    &rarr; Weekly Meal Plan
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => scrollToPlannerSection("analytics")}
-                    className={`w-full rounded-lg px-3 py-2 text-left text-xs font-semibold transition ${
-                      activePlannerSection === "analytics"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "text-emerald-700 hover:bg-emerald-50"
-                    }`}
-                  >
-                    &rarr; Weekly Analytics
-                  </button>
-                </div>
-              )}
-            </div>
-          </aside>
-
-          <div className="xl:ml-[19rem]">
-          <section className="mb-6 rounded-2xl border border-emerald-100 bg-white/75 backdrop-blur-sm px-5 py-5 sm:px-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.15em] text-emerald-600">
-                  MealsForge Dashboard
-                </p>
-                <h1 className="mt-1.5 text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-gray-900">
-                  Plan Smarter. Eat Better.
-                </h1>
-                <p className="mt-1.5 text-sm sm:text-base text-gray-600 max-w-3xl">
-                  Build a weekly plan, track progress, and regenerate meals instantly.
-                </p>
-              </div>
-              {hasMealPlan && (
-                <div className="inline-flex items-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-                  Active view: {viewMode === "weekly" ? "Weekly Plan" : "Daily Plan"}
-                </div>
-              )}
-            </div>
-          </section>
-
-          {activeTab === "planner" && (
-          <>
-          {/* Left Sidebar - Controls */}
-          <aside className="w-full">
-            <div className="grid grid-cols-1 gap-8 xl:grid-cols-2 xl:items-start">
-              {/* Preferences Card */}
-              <form onSubmit={handleSubmit} className="order-1 w-full bg-white/85 backdrop-blur-sm rounded-2xl p-5 sm:p-6 shadow-lg shadow-gray-200/50 border border-white/60 space-y-5 xl:sticky xl:top-[168px]">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2.5 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="font-bold text-base text-gray-800">Preferences</h2>
-              </div>
-
-              {/* Diet Toggles */}
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Leaf className="w-4 h-4 text-emerald-500" />
-                  Diet Style
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  <ToggleButton active={isVegetarian} onClick={() => setIsVegetarian(!isVegetarian)} icon={Salad} label="Vegetarian" />
-                  <ToggleButton active={isHighProtein} onClick={() => setIsHighProtein(!isHighProtein)} icon={Beef} label="High Protein" />
-                  <ToggleButton active={isLowCarb} onClick={() => setIsLowCarb(!isLowCarb)} icon={Zap} label="Low Carb" />
-                </div>
-              </div>
-
-              {/* Calorie Slider */}
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Flame className="w-4 h-4 text-orange-500" />
-                  Daily Calories: <span className="text-emerald-600 font-bold text-base">{calories} kcal</span>
-                </label>
-                <input
-                  type="range"
-                  min={1200}
-                  max={4000}
-                  step={50}
-                  value={calories}
-                  onChange={(e) => setCalories(Number(e.target.value))}
-                  className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                />
-                <div className="flex justify-between text-sm text-gray-400">
-                  <span>1200</span>
-                  <span>4000</span>
-                </div>
-              </div>
-
-              {/* Cuisine Input */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-emerald-500" />
-                  Serving Count
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[1, 2, 4, 6].map((count) => (
+                <div className="border-t border-slate-100 py-1">
+                  {(["plan", "analytics"] as const).map((section) => (
                     <button
-                      key={count}
+                      key={section}
                       type="button"
-                      onClick={() => setServingCount(count)}
-                      className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                        servingCount === count
-                          ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                          : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                      onClick={() => scrollToPlannerSection(section)}
+                      className={`w-full pl-10 pr-3 py-2 text-left text-xs font-medium transition-colors ${
+                        activePlannerSection === section
+                          ? "text-emerald-700 bg-emerald-50/70"
+                          : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
                       }`}
                     >
-                      {count} {count === 1 ? "serving" : "servings"}
+                      {section === "plan" ? "Weekly Plan" : "Analytics"}
                     </button>
                   ))}
                 </div>
-              </div>
-
-              {/* Cuisine Input */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <Utensils className="w-4 h-4 text-purple-500" />
-                  Preferred Cuisine
-                </label>
-                <input
-                  type="text"
-                  value={cuisine}
-                  onChange={(e) => setCuisine(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-sm"
-                  placeholder="e.g., Italian, Asian, Mediterranean"
-                />
-              </div>
-
-              {/* Allergies Input */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-red-500" />
-                  Allergies / Restrictions
-                </label>
-                <input
-                  type="text"
-                  value={allergies}
-                  onChange={(e) => setAllergies(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all text-sm"
-                  placeholder="e.g., Nuts, Dairy, Gluten"
-                />
-              </div>
-
-              {/* Snacks Toggle */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <div className="flex items-center gap-3">
-                  <Cookie className="w-5 h-5 text-amber-500" />
-                  <span className="text-sm font-medium text-gray-700">Include Snacks</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSnacks(!snacks)}
-                  className={`relative h-8 w-20 rounded-full transition-colors duration-300 ${
-                    snacks ? "bg-emerald-500" : "bg-gray-300"
-                  }`}
-                >
-                  <span
-                    className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow transition-transform duration-300 ${
-                      snacks ? "translate-x-12" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={mutation.isPending}
-                className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-2"
-              >
-                {mutation.isPending ? (
-                  <>
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-6 h-6" />
-                    Generate Meal Plan
-                  </>
-                )}
-              </button>
-
-              {mutation.isError && (
-                <div className="p-5 bg-red-50 border border-red-200 rounded-xl flex items-center gap-4">
-                  <AlertCircle className="w-6 h-6 text-red-500 flex-shrink-0" />
-                  <p className="text-base text-red-700">{mutation.error?.message || "An error occurred."}</p>
-                </div>
               )}
-              </form>
-
-              {/* Quick Stats Card */}
-              <div className="order-2 w-full bg-white/85 backdrop-blur-sm rounded-2xl p-5 sm:p-6 shadow-lg shadow-gray-200/50 border border-white/60">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2.5 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl">
-                  <Target className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="font-bold text-base text-gray-800">Daily Goals</h2>
-              </div>
-
-              <div className="space-y-8">
-                <CalorieProgressBar current={currentProgressCalories} goal={calories} />
-
-                <div className="flex items-center justify-center py-4">
-                  <MacroPieChart protein={30} carbs={45} fats={25} />
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="p-3 bg-red-50 rounded-2xl">
-                    <Beef className="w-5 h-5 text-red-500 mx-auto mb-1.5" />
-                    <p className="text-xs text-gray-500">Protein</p>
-                    <p className="font-bold text-base text-red-600">30%</p>
-                  </div>
-                  <div className="p-3 bg-amber-50 rounded-2xl">
-                    <Wheat className="w-5 h-5 text-amber-500 mx-auto mb-1.5" />
-                    <p className="text-xs text-gray-500">Carbs</p>
-                    <p className="font-bold text-base text-amber-600">45%</p>
-                  </div>
-                  <div className="p-3 bg-green-50 rounded-2xl">
-                    <Droplets className="w-5 h-5 text-green-500 mx-auto mb-1.5" />
-                    <p className="text-xs text-gray-500">Fats</p>
-                    <p className="font-bold text-base text-green-600">25%</p>
-                  </div>
-                </div>
-                {hasMealPlan && (
-                  <div className="rounded-2xl p-4 bg-emerald-50 border border-emerald-100">
-                    <p className="text-sm font-medium text-emerald-700">
-                      Adherence: {adherenceSummary.adherence}%
-                    </p>
-                    <p className="text-xs text-emerald-600 mt-1">
-                      {adherenceSummary.completedMeals} of {adherenceSummary.totalMeals} meals completed
-                    </p>
-                  </div>
-                )}
-              </div>
-              </div>
             </div>
           </aside>
 
-          {/* Main Content - Meal Plan */}
-          <section className="w-full">
-            {mutation.isPending || isLoadingInitialPlan ? (
-              <div className="bg-white/85 backdrop-blur-sm rounded-3xl shadow-xl shadow-gray-200/60 border border-white/60 min-h-[520px]">
-                <AILoadingAnimation isGenerating={mutation.isPending} />
+          {/* ── Content Area ── */}
+          <div className="xl:ml-[17rem]">
+
+            {/* Page Header */}
+            <section className="mb-6 flex items-center justify-between">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+                  Meal Planner
+                </h1>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  {new Date().toLocaleDateString("en-AU", {
+                    weekday: "long",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
               </div>
-            ) : hasMealPlan ? (
-              <div className="space-y-8">
-                {activePlanData?.warning && (
-                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">
-                    {activePlanData.warning}
+              <div className="flex items-center gap-3">
+                {hasMealPlan && (
+                  <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Active Plan
                   </div>
                 )}
-                {/* Today's Highlight */}
-                {todaysMealPlan && viewMode === "weekly" && (
-                  <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-6 text-white shadow-xl shadow-emerald-500/30">
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                        <Zap className="w-6 h-6" />
-                      </div>
-                      <h2 className="text-base font-bold">Today&apos;s Highlights</h2>
-                    </div>
-                    <div className="grid sm:grid-cols-3 gap-5">
-                      <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Coffee className="w-5 h-5" />
-                          <span className="text-sm opacity-80">Breakfast</span>
-                        </div>
-                        <p className="font-medium">{todaysMealPlan.breakfast}</p>
-                      </div>
-                      <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Sun className="w-5 h-5" />
-                          <span className="text-sm opacity-80">Lunch</span>
-                        </div>
-                        <p className="font-medium">{todaysMealPlan.lunch}</p>
-                      </div>
-                      <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Moon className="w-5 h-5" />
-                          <span className="text-sm opacity-80">Dinner</span>
-                        </div>
-                        <p className="font-medium">{todaysMealPlan.dinner}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Weekly Overview */}
-                <div ref={weeklyPlanRef} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg shadow-gray-200/40 border border-white/50">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-xl">
-                        <Calendar className="w-5 h-5 text-white" />
-                      </div>
-                      <h2 className="font-bold text-base text-gray-800">Weekly Meal Plan</h2>
-                    </div>
-                    <div className="flex items-center gap-2">
+                {hasMealPlan && (
+                  <div className="hidden sm:flex bg-white rounded-lg border border-slate-200 p-0.5 gap-0.5">
+                    {(["daily", "weekly"] as const).map((mode) => (
                       <button
-                        onClick={handleDeletePlan}
-                        disabled={isDeleting}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50"
+                        key={mode}
+                        onClick={() => setViewMode(mode)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all capitalize ${
+                          viewMode === mode
+                            ? "bg-slate-900 text-white shadow-sm"
+                            : "text-slate-500 hover:text-slate-700"
+                        }`}
                       >
-                        <Trash2 className="w-4 h-4" />
-                        {isDeleting ? "Clearing..." : "Clear Plan"}
+                        {mode}
                       </button>
-                      <button
-                        onClick={() => mutation.mutate({
-                          dietType: dietType || "Balanced",
-                          calories,
-                          allergies,
-                          cuisine,
-                          snacks,
-                          servingCount,
-                          days: 7,
-                        })}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                        Regenerate All
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    {daysOfWeek.map((day) => (
-                      <DayCard
-                        key={day}
-                        day={day}
-                        mealPlan={getMealPlanForDay(day)}
-                        isToday={day === today}
-                        isExpanded={expandedDay === day}
-                        onToggle={() => setExpandedDay(expandedDay === day ? null : day)}
-                        mealStatuses={mealStatuses[day]}
-                        onSetMealStatus={(mealType, status) =>
-                          handleSetMealStatus(day, mealType, status)
-                        }
-                        onSwapMeal={(mealType) => handleSwapMeal(day, mealType)}
-                      />
                     ))}
                   </div>
-                </div>
-
-                {/* Weekly Analytics */}
-                <div ref={weeklyAnalyticsRef} className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-6 border border-amber-200/50 space-y-5">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-amber-100 rounded-xl">
-                      <TrendingUp className="w-5 h-5 text-amber-600" />
-                    </div>
-                    <h3 className="font-bold text-sm text-amber-800">Weekly Analytics</h3>
-                  </div>
-
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div className="rounded-xl bg-white/80 border border-amber-100 p-3">
-                      <p className="text-xs text-gray-500">Adherence</p>
-                      <p className="text-xl font-bold text-amber-700">{analyticsSummary.overallAdherence}%</p>
-                    </div>
-                    <div className="rounded-xl bg-white/80 border border-amber-100 p-3">
-                      <p className="text-xs text-gray-500">Calorie Target Hit</p>
-                      <p className="text-xl font-bold text-amber-700">{analyticsSummary.calorieTargetHitRate}%</p>
-                    </div>
-                    <div className="rounded-xl bg-white/80 border border-amber-100 p-3">
-                      <p className="text-xs text-gray-500">Protein Consistency</p>
-                      <p className="text-xl font-bold text-amber-700">{analyticsSummary.proteinConsistency}%</p>
-                    </div>
-                    <div className="rounded-xl bg-white/80 border border-amber-100 p-3">
-                      <p className="text-xs text-gray-500">Current Streak</p>
-                      <p className="text-xl font-bold text-amber-700">{analyticsSummary.currentDayStreak} days</p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-semibold text-amber-800 mb-2">Completion Heatmap</p>
-                    <div className="space-y-2">
-                      {analyticsHeatmap.length === 0 ? (
-                        <p className="text-sm text-amber-700">No analytics data yet.</p>
-                      ) : (
-                        analyticsHeatmap.map((day) => {
-                          const slots = [
-                            day.breakfast,
-                            day.lunch,
-                            day.dinner,
-                            day.snacks,
-                          ];
-                          return (
-                            <div key={day.dayName} className="flex items-center gap-3">
-                              <span className="w-24 text-sm text-amber-900">{day.dayName.slice(0, 3)}</span>
-                              <div className="flex gap-2">
-                                {slots.map((slot, index) => (
-                                  <span
-                                    key={`${day.dayName}-${index}`}
-                                    className={`w-5 h-5 rounded-md border ${
-                                      slot === "completed"
-                                        ? "bg-emerald-400 border-emerald-500"
-                                        : slot === "skipped"
-                                        ? "bg-amber-300 border-amber-400"
-                                        : "bg-gray-200 border-gray-300"
-                                    }`}
-                                    title={slot}
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
-            ) : (
-              <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-10 shadow-xl shadow-gray-200/50 border border-white/50 text-center">
-                <div className="max-w-lg mx-auto">
-                  <div className="w-24 h-24 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-full mx-auto mb-6 flex items-center justify-center">
-                    <Utensils className="w-12 h-12 text-emerald-500" />
+            </section>
+
+            {/* ── PLANNER TAB ── */}
+            {activeTab === "planner" && (
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-[360px_1fr] xl:items-start">
+
+                {/* Left Column: preferences + stats */}
+                <div className="space-y-4 xl:sticky xl:top-[168px] xl:max-h-[calc(100vh-180px)] xl:overflow-y-auto xl:pb-4">
+
+                  {/* Preferences Form */}
+                  <form
+                    onSubmit={handleSubmit}
+                    className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-5"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-emerald-600 rounded-xl">
+                        <Sparkles className="w-4 h-4 text-white" />
+                      </div>
+                      <h2 className="font-bold text-sm text-slate-800">Preferences</h2>
+                    </div>
+
+                    {/* Diet Style */}
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Leaf className="w-3.5 h-3.5 text-emerald-500" />
+                        Diet Style
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <ToggleButton
+                          active={isVegetarian}
+                          onClick={() => setIsVegetarian(!isVegetarian)}
+                          icon={Salad}
+                          label="Vegetarian"
+                        />
+                        <ToggleButton
+                          active={isHighProtein}
+                          onClick={() => setIsHighProtein(!isHighProtein)}
+                          icon={Beef}
+                          label="High Protein"
+                        />
+                        <ToggleButton
+                          active={isLowCarb}
+                          onClick={() => setIsLowCarb(!isLowCarb)}
+                          icon={Zap}
+                          label="Low Carb"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Calories */}
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Flame className="w-3.5 h-3.5 text-orange-500" />
+                        Daily Calories
+                        <span className="ml-auto text-sm font-bold text-emerald-600 normal-case">
+                          {calories} kcal
+                        </span>
+                      </p>
+                      <input
+                        type="range"
+                        min={1200}
+                        max={4000}
+                        step={50}
+                        value={calories}
+                        onChange={(e) => setCalories(Number(e.target.value))}
+                        className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-emerald-600"
+                      />
+                      <div className="flex justify-between text-xs text-slate-400">
+                        <span>1,200</span>
+                        <span>4,000 kcal</span>
+                      </div>
+                    </div>
+
+                    {/* Serving Count */}
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-blue-500" />
+                        Serving Count
+                      </p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {[1, 2, 4, 6].map((count) => (
+                          <button
+                            key={count}
+                            type="button"
+                            onClick={() => setServingCount(count)}
+                            className={`rounded-xl border py-2 text-sm font-bold transition-all ${
+                              servingCount === count
+                                ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                                : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                            }`}
+                          >
+                            {count}x
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Cuisine */}
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Utensils className="w-3.5 h-3.5 text-purple-500" />
+                        Preferred Cuisine
+                      </p>
+                      <input
+                        type="text"
+                        value={cuisine}
+                        onChange={(e) => setCuisine(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition text-sm text-slate-800 placeholder:text-slate-400"
+                        placeholder="e.g. Italian, Asian, Mediterranean"
+                      />
+                    </div>
+
+                    {/* Allergies */}
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+                        Allergies / Restrictions
+                      </p>
+                      <input
+                        type="text"
+                        value={allergies}
+                        onChange={(e) => setAllergies(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 outline-none transition text-sm text-slate-800 placeholder:text-slate-400"
+                        placeholder="e.g. Nuts, Dairy, Gluten"
+                      />
+                    </div>
+
+                    {/* Snacks Toggle */}
+                    <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                      <div className="flex items-center gap-2.5">
+                        <Cookie className="w-4 h-4 text-amber-500" />
+                        <span className="text-sm font-semibold text-slate-700">
+                          Include Snacks
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSnacks(!snacks)}
+                        className={`relative h-6 w-11 rounded-full transition-colors duration-300 focus:outline-none ${
+                          snacks ? "bg-emerald-500" : "bg-slate-300"
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-300 ${
+                            snacks ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Submit */}
+                    <button
+                      type="submit"
+                      disabled={mutation.isPending}
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-sm rounded-xl shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {mutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          Generate Meal Plan
+                        </>
+                      )}
+                    </button>
+
+                    {mutation.isError && (
+                      <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
+                        <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                        <p className="text-xs text-red-700">
+                          {mutation.error?.message || "An error occurred."}
+                        </p>
+                      </div>
+                    )}
+                  </form>
+
+                  {/* Daily Goals Card */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-orange-50 rounded-xl">
+                        <Target className="w-4 h-4 text-orange-500" />
+                      </div>
+                      <h2 className="font-bold text-sm text-slate-800">Daily Goals</h2>
+                    </div>
+
+                    <CalorieProgressBar
+                      current={currentProgressCalories}
+                      goal={calories}
+                    />
+
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        {
+                          icon: Beef,
+                          label: "Protein",
+                          value: "~25%",
+                          iconColor: "text-red-500",
+                          valueColor: "text-red-600",
+                          bg: "bg-red-50 border-red-100",
+                        },
+                        {
+                          icon: Wheat,
+                          label: "Carbs",
+                          value: "~45%",
+                          iconColor: "text-amber-500",
+                          valueColor: "text-amber-600",
+                          bg: "bg-amber-50 border-amber-100",
+                        },
+                        {
+                          icon: Droplets,
+                          label: "Fats",
+                          value: "~30%",
+                          iconColor: "text-green-500",
+                          valueColor: "text-green-600",
+                          bg: "bg-green-50 border-green-100",
+                        },
+                      ].map(({ icon: Ico, label, value, iconColor, valueColor, bg }) => (
+                        <div
+                          key={label}
+                          className={`p-2.5 rounded-xl border ${bg} text-center`}
+                        >
+                          <Ico className={`w-3.5 h-3.5 ${iconColor} mx-auto mb-1`} />
+                          <p className="text-[10px] text-slate-500 font-medium">
+                            {label}
+                          </p>
+                          <p className={`text-sm font-bold ${valueColor}`}>{value}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {hasMealPlan && (
+                      <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3.5">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-bold text-emerald-700">
+                            Weekly Adherence
+                          </p>
+                          <p className="text-lg font-black text-emerald-700">
+                            {adherenceSummary.adherence}%
+                          </p>
+                        </div>
+                        <div className="h-1.5 bg-emerald-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-500 rounded-full transition-all duration-700"
+                            style={{ width: `${adherenceSummary.adherence}%` }}
+                          />
+                        </div>
+                        <p className="text-[11px] text-emerald-600 mt-1.5">
+                          {adherenceSummary.completedMeals} of{" "}
+                          {adherenceSummary.totalMeals} meals completed
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-800 mb-3">Ready to Plan Your Week?</h2>
-                  <p className="text-gray-500 mb-6 text-sm">
-                    Set your preferences on the left and let our AI create a personalized meal plan tailored to your goals.
-                  </p>
-                  <div className="flex items-center justify-center gap-6 text-sm text-gray-400">
-                    <span className="flex items-center gap-1.5">
-                      <Check className="w-4 h-4 text-emerald-500" />
-                      Personalized meals
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <Check className="w-4 h-4 text-emerald-500" />
-                      Balanced nutrition
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <Check className="w-4 h-4 text-emerald-500" />
-                      Easy to follow
-                    </span>
-                  </div>
+                </div>
+
+                {/* Right Column: meal plan content */}
+                <div className="space-y-5">
+                  {mutation.isPending || isLoadingInitialPlan ? (
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm min-h-[520px]">
+                      <AILoadingAnimation isGenerating={mutation.isPending} />
+                    </div>
+                  ) : hasMealPlan ? (
+                    <>
+                      {activePlanData?.warning && (
+                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0 text-amber-500" />
+                          {activePlanData.warning}
+                        </div>
+                      )}
+
+                      {/* Today's Hero */}
+                      {todaysMealPlan && viewMode === "weekly" && (
+                        <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 to-teal-700 rounded-2xl p-5 text-white shadow-lg shadow-emerald-600/20">
+                          <div className="absolute -top-8 -right-8 w-40 h-40 bg-white/5 rounded-full pointer-events-none" />
+                          <div className="absolute -bottom-6 left-1/4 w-28 h-28 bg-white/5 rounded-full pointer-events-none" />
+                          <div className="relative">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-2">
+                                <div className="p-1.5 bg-white/20 rounded-lg">
+                                  <Zap className="w-3.5 h-3.5" />
+                                </div>
+                                <span className="text-sm font-bold">
+                                  Today&apos;s Meals
+                                </span>
+                              </div>
+                              <span className="text-xs text-white/60 font-medium">
+                                {new Date().toLocaleDateString("en-AU", {
+                                  weekday: "short",
+                                  day: "numeric",
+                                  month: "short",
+                                })}
+                              </span>
+                            </div>
+                            <div className="grid sm:grid-cols-3 gap-2.5">
+                              {[
+                                {
+                                  icon: Coffee,
+                                  label: "Breakfast",
+                                  meal: todaysMealPlan.breakfast,
+                                  status: mealStatuses[today]?.breakfast,
+                                },
+                                {
+                                  icon: Sun,
+                                  label: "Lunch",
+                                  meal: todaysMealPlan.lunch,
+                                  status: mealStatuses[today]?.lunch,
+                                },
+                                {
+                                  icon: Moon,
+                                  label: "Dinner",
+                                  meal: todaysMealPlan.dinner,
+                                  status: mealStatuses[today]?.dinner,
+                                },
+                              ].map(({ icon: MealIcon, label, meal, status }) => (
+                                <div
+                                  key={label}
+                                  className={`rounded-xl p-3.5 transition-all ${
+                                    status === "completed"
+                                      ? "bg-white/20 ring-1 ring-white/30"
+                                      : status === "skipped"
+                                      ? "bg-white/5 opacity-60"
+                                      : "bg-white/10"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                      <MealIcon className="w-3.5 h-3.5 opacity-80" />
+                                      <span className="text-[11px] font-bold opacity-80 uppercase tracking-wide">
+                                        {label}
+                                      </span>
+                                    </div>
+                                    {status === "completed" && (
+                                      <Check className="w-3.5 h-3.5" />
+                                    )}
+                                  </div>
+                                  <p className="text-sm font-medium leading-snug line-clamp-2">
+                                    {meal ?? (
+                                      <span className="opacity-40 italic text-xs">
+                                        Not set
+                                      </span>
+                                    )}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Weekly Plan */}
+                      <div
+                        ref={weeklyPlanRef}
+                        className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5"
+                      >
+                        <div className="flex items-center justify-between mb-5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="p-2 bg-indigo-50 rounded-xl">
+                              <Calendar className="w-4 h-4 text-indigo-600" />
+                            </div>
+                            <div>
+                              <h2 className="font-bold text-sm text-slate-800">
+                                Weekly Meal Plan
+                              </h2>
+                              <p className="text-[11px] text-slate-400">
+                                {adherenceSummary.completedMeals} of{" "}
+                                {adherenceSummary.totalMeals} meals done
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() =>
+                                mutation.mutate({
+                                  dietType: dietType || "Balanced",
+                                  calories,
+                                  allergies,
+                                  cuisine,
+                                  snacks,
+                                  servingCount,
+                                  days: 7,
+                                })
+                              }
+                              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              Regenerate
+                            </button>
+                            <button
+                              onClick={handleDeletePlan}
+                              disabled={isDeleting}
+                              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              {isDeleting ? "Clearing..." : "Clear"}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2.5">
+                          {daysOfWeek.map((day) => (
+                            <DayCard
+                              key={day}
+                              day={day}
+                              mealPlan={getMealPlanForDay(day)}
+                              isToday={day === today}
+                              isExpanded={expandedDay === day}
+                              onToggle={() =>
+                                setExpandedDay(expandedDay === day ? null : day)
+                              }
+                              mealStatuses={mealStatuses[day]}
+                              onSetMealStatus={(mealType, status) =>
+                                handleSetMealStatus(day, mealType, status)
+                              }
+                              onSwapMeal={(mealType) => handleSwapMeal(day, mealType)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Analytics */}
+                      <div
+                        ref={weeklyAnalyticsRef}
+                        className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-5"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-2 bg-emerald-50 rounded-xl">
+                            <TrendingUp className="w-4 h-4 text-emerald-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-sm text-slate-800">
+                              Weekly Analytics
+                            </h3>
+                            <p className="text-[11px] text-slate-400">
+                              Tracking your current plan
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                          {[
+                            {
+                              label: "Adherence",
+                              value: `${analyticsSummary.overallAdherence}%`,
+                              color: "text-emerald-600",
+                              bg: "bg-emerald-50 border-emerald-100",
+                            },
+                            {
+                              label: "Calorie Hit",
+                              value: `${analyticsSummary.calorieTargetHitRate}%`,
+                              color: "text-blue-600",
+                              bg: "bg-blue-50 border-blue-100",
+                            },
+                            {
+                              label: "Protein",
+                              value: `${analyticsSummary.proteinConsistency}%`,
+                              color: "text-violet-600",
+                              bg: "bg-violet-50 border-violet-100",
+                            },
+                            {
+                              label: "Day Streak",
+                              value: `${analyticsSummary.currentDayStreak}d`,
+                              color: "text-orange-600",
+                              bg: "bg-orange-50 border-orange-100",
+                            },
+                          ].map(({ label, value, color, bg }) => (
+                            <div key={label} className={`rounded-xl border p-4 ${bg}`}>
+                              <p className="text-[11px] text-slate-500 font-semibold mb-1">
+                                {label}
+                              </p>
+                              <p className={`text-2xl font-black ${color}`}>{value}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-xs font-bold text-slate-600">
+                              Completion Heatmap
+                            </p>
+                            <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                              <span className="flex items-center gap-1">
+                                <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400 inline-block" />
+                                Done
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span className="w-2.5 h-2.5 rounded-sm bg-slate-200 inline-block" />
+                                Skipped
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span className="w-2.5 h-2.5 rounded-sm bg-slate-100 border border-slate-200 inline-block" />
+                                Pending
+                              </span>
+                            </div>
+                          </div>
+                          {analyticsHeatmap.length === 0 ? (
+                            <p className="text-xs text-slate-400">
+                              Mark meals as done to see your heatmap.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {analyticsHeatmap.map((dayRow) => (
+                                <div
+                                  key={dayRow.dayName}
+                                  className="flex items-center gap-3"
+                                >
+                                  <span className="w-8 text-xs font-bold text-slate-400">
+                                    {dayRow.dayName.slice(0, 3)}
+                                  </span>
+                                  <div className="flex gap-1.5">
+                                    {(
+                                      [
+                                        "breakfast",
+                                        "lunch",
+                                        "dinner",
+                                        "snacks",
+                                      ] as const
+                                    ).map((slot, i) => (
+                                      <span
+                                        key={slot}
+                                        title={`${["B", "L", "D", "S"][i]}: ${dayRow[slot]}`}
+                                        className={`w-6 h-6 rounded-md text-[9px] flex items-center justify-center font-black transition-colors ${
+                                          dayRow[slot] === "completed"
+                                            ? "bg-emerald-400 text-white"
+                                            : dayRow[slot] === "skipped"
+                                            ? "bg-slate-200 text-slate-500"
+                                            : "bg-slate-100 text-slate-300 border border-slate-200"
+                                        }`}
+                                      >
+                                        {["B", "L", "D", "S"][i]}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    /* Empty State */
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 text-center">
+                      <div className="max-w-sm mx-auto">
+                        <div className="w-16 h-16 bg-emerald-600 rounded-2xl mx-auto mb-5 flex items-center justify-center shadow-lg shadow-emerald-600/25">
+                          <ChefHat className="w-8 h-8 text-white" />
+                        </div>
+                        <h2 className="text-lg font-bold text-slate-800 mb-2">
+                          Your plan is empty
+                        </h2>
+                        <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+                          Set your preferences and click{" "}
+                          <span className="font-bold text-emerald-600">
+                            Generate Meal Plan
+                          </span>{" "}
+                          to get a personalised 7-day plan.
+                        </p>
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            {
+                              icon: Leaf,
+                              text: "Diet-aware",
+                              iconColor: "text-emerald-600",
+                              iconBg: "bg-emerald-50",
+                            },
+                            {
+                              icon: Target,
+                              text: "Calorie-matched",
+                              iconColor: "text-orange-600",
+                              iconBg: "bg-orange-50",
+                            },
+                            {
+                              icon: Sparkles,
+                              text: "AI-generated",
+                              iconColor: "text-violet-600",
+                              iconBg: "bg-violet-50",
+                            },
+                          ].map(({ icon: Ico, text, iconColor, iconBg }) => (
+                            <div
+                              key={text}
+                              className="flex flex-col items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100"
+                            >
+                              <div className={`p-2 rounded-lg ${iconBg}`}>
+                                <Ico className={`w-4 h-4 ${iconColor}`} />
+                              </div>
+                              <span className="text-xs font-semibold text-slate-600">
+                                {text}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
-          </section>
-          </>
-          )}
 
-          {activeTab === "history" && (
-            <section className="w-full rounded-3xl border border-emerald-100 bg-white/85 p-6 sm:p-8 shadow-sm">
-              <div className="mb-5 flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">Meal Plan History</h2>
-                <button
-                  type="button"
-                  onClick={fetchMealHistory}
-                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh
-                </button>
-              </div>
-              <div className="mb-6 grid gap-4 lg:grid-cols-2">
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                    Monthly Estimate
-                  </p>
-                  {isProgressLoading ? (
-                    <p className="mt-2 text-sm text-emerald-700">Calculating...</p>
-                  ) : (
-                    (() => {
-                      const latestMonth = Object.keys(progressSummary?.monthly ?? {})
-                        .sort()
-                        .pop();
-                      const bucket = latestMonth
-                        ? progressSummary?.monthly?.[latestMonth]
-                        : undefined;
-                      return (
-                        <div className="mt-2 space-y-1 text-sm text-emerald-800">
-                          <p>
-                            {latestMonth ?? "N/A"}: {bucket?.plansGenerated ?? 0} plans
-                          </p>
-                          <p>Avg adherence: {bucket?.avgAdherence ?? 0}%</p>
-                          <p>Calorie hit: {bucket?.calorieTargetHitRate ?? 0}%</p>
-                        </div>
-                      );
-                    })()
-                  )}
+            {/* ── HISTORY TAB ── */}
+            {activeTab === "history" && (
+              <section className="w-full rounded-2xl border border-slate-200 bg-white shadow-sm p-5 sm:p-6">
+                <div className="mb-5 flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-slate-900">Plan History</h2>
+                  <button
+                    type="button"
+                    onClick={fetchMealHistory}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Refresh
+                  </button>
                 </div>
-                <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-                    Yearly Estimate
-                  </p>
-                  {isProgressLoading ? (
-                    <p className="mt-2 text-sm text-amber-700">Calculating...</p>
-                  ) : (
-                    (() => {
-                      const latestYear = Object.keys(progressSummary?.yearly ?? {})
-                        .sort()
-                        .pop();
-                      const bucket = latestYear
-                        ? progressSummary?.yearly?.[latestYear]
-                        : undefined;
-                      return (
-                        <div className="mt-2 space-y-1 text-sm text-amber-800">
-                          <p>
-                            {latestYear ?? "N/A"}: {bucket?.plansGenerated ?? 0} plans
+
+                <div className="mb-5 grid gap-3 sm:grid-cols-2">
+                  {[
+                    {
+                      label: "This Month",
+                      border: "border-emerald-100",
+                      bg: "bg-emerald-50/70",
+                      headColor: "text-emerald-700",
+                      bodyColor: "text-emerald-800",
+                      getEntry: () => {
+                        const key = Object.keys(progressSummary?.monthly ?? {})
+                          .sort()
+                          .pop();
+                        return {
+                          key,
+                          bucket: key
+                            ? progressSummary?.monthly?.[key]
+                            : undefined,
+                        };
+                      },
+                    },
+                    {
+                      label: "This Year",
+                      border: "border-amber-100",
+                      bg: "bg-amber-50/70",
+                      headColor: "text-amber-700",
+                      bodyColor: "text-amber-800",
+                      getEntry: () => {
+                        const key = Object.keys(progressSummary?.yearly ?? {})
+                          .sort()
+                          .pop();
+                        return {
+                          key,
+                          bucket: key
+                            ? progressSummary?.yearly?.[key]
+                            : undefined,
+                        };
+                      },
+                    },
+                  ].map(({ label, border, bg, headColor, bodyColor, getEntry }) => {
+                    const { key, bucket } = getEntry();
+                    return (
+                      <div
+                        key={label}
+                        className={`rounded-xl border ${border} ${bg} p-4`}
+                      >
+                        <p
+                          className={`text-[11px] font-bold uppercase tracking-wider ${headColor}`}
+                        >
+                          {label}
+                        </p>
+                        {isProgressLoading ? (
+                          <p className={`mt-2 text-xs ${headColor}`}>
+                            Calculating...
                           </p>
-                          <p>Avg adherence: {bucket?.avgAdherence ?? 0}%</p>
-                          <p>Calorie hit: {bucket?.calorieTargetHitRate ?? 0}%</p>
-                        </div>
-                      );
-                    })()
-                  )}
+                        ) : (
+                          <div className={`mt-2 ${bodyColor}`}>
+                            <p className="text-sm font-bold">
+                              {key ?? "N/A"}: {bucket?.plansGenerated ?? 0} plans
+                            </p>
+                            <p className="text-xs mt-0.5">
+                              Avg adherence: {bucket?.avgAdherence ?? 0}% · Calorie
+                              hit: {bucket?.calorieTargetHitRate ?? 0}%
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-              <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
-                <div className="max-h-[72vh] overflow-y-auto pr-1">
-                  {isHistoryLoading ? (
-                    <p className="text-sm text-gray-500">Loading history...</p>
-                  ) : historyItems.length === 0 ? (
-                    <p className="text-sm text-gray-500">
-                      No history yet. Generate your first plan.
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      {historyItems.map((item) => (
+
+                <div className="grid gap-5 xl:grid-cols-[300px_1fr]">
+                  <div className="max-h-[68vh] overflow-y-auto pr-1 space-y-2">
+                    {isHistoryLoading ? (
+                      <p className="text-xs text-slate-500 py-4">
+                        Loading history...
+                      </p>
+                    ) : historyItems.length === 0 ? (
+                      <p className="text-xs text-slate-500 py-4">
+                        No history yet. Generate your first plan.
+                      </p>
+                    ) : (
+                      historyItems.map((item) => (
                         <button
                           key={item.id}
                           type="button"
                           onClick={() => loadHistoryPlan(item.id)}
-                          className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                          className={`w-full rounded-xl border px-4 py-3.5 text-left transition-all ${
                             selectedPlanId === item.id
-                              ? "border-emerald-400 bg-emerald-50"
-                              : "border-gray-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/40"
+                              ? "border-emerald-400 bg-emerald-50 shadow-sm"
+                              : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
                           }`}
                         >
-                          <p className="text-sm font-semibold text-gray-900">
-                            {new Date(item.createdAt).toLocaleString()}
+                          <p className="text-sm font-bold text-slate-800">
+                            {new Date(item.createdAt).toLocaleDateString("en-AU", {
+                              weekday: "short",
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
                           </p>
-                          <p className="mt-1 text-xs text-gray-600">
-                            {item.dietType || "Balanced"} • {item.calories ?? "N/A"} kcal •{" "}
-                            {item.servingCount ?? 1} serving(s) • {item.source ?? "provider"}
-                          </p>
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {[
+                              item.dietType || "Balanced",
+                              `${item.calories ?? "N/A"} kcal`,
+                              `${item.servingCount ?? 1} serving${
+                                (item.servingCount ?? 1) > 1 ? "s" : ""
+                              }`,
+                            ].map((tag) => (
+                              <span
+                                key={tag}
+                                className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
                           {item.warning && (
-                            <p className="mt-2 text-xs text-amber-700">{item.warning}</p>
+                            <p className="mt-1.5 text-[10px] text-amber-700">
+                              {item.warning}
+                            </p>
                           )}
                         </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                      ))
+                    )}
+                  </div>
 
-                <div className="rounded-2xl border border-emerald-100 bg-white p-5 sm:p-6">
-                  {!selectedPlanData?.mealPlan ? (
-                    <p className="text-sm text-gray-500">
-                      Select a history entry to view full plan details.
-                    </p>
-                  ) : (
-                    <div className="space-y-5">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                            Selected Week
-                          </p>
-                          <p className="text-lg font-bold text-gray-900">
-                            {selectedHistoryItem?.createdAt
-                              ? new Date(selectedHistoryItem.createdAt).toLocaleString()
-                              : "Current Plan"}
-                          </p>
-                          <p className="mt-1 text-sm text-gray-600">
-                            Adherence {analyticsSummary.overallAdherence}% • Calorie hit{" "}
-                            {analyticsSummary.calorieTargetHitRate}% • Streak{" "}
-                            {analyticsSummary.currentDayStreak} day(s)
-                          </p>
-                          <p className="mt-1 text-xs text-gray-500">
-                            {(selectedHistoryItem?.dietType || "Balanced")} •{" "}
-                            {selectedHistoryItem?.calories ?? "N/A"} kcal •{" "}
-                            {selectedHistoryItem?.servingCount ?? selectedPlanData.servingCount ?? 1} serving(s)
-                          </p>
+                  <div className="rounded-xl border border-slate-200 bg-white p-5">
+                    {!selectedPlanData?.mealPlan ? (
+                      <div className="flex flex-col items-center justify-center h-48 gap-3 text-center">
+                        <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+                          <History className="w-5 h-5 text-slate-400" />
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab("planner")}
-                          className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
-                        >
-                          Open In Planner
-                        </button>
+                        <p className="text-sm text-slate-500">
+                          Select a history entry to view the full plan.
+                        </p>
                       </div>
-
-                      <div className="max-h-[56vh] space-y-3 overflow-y-auto pr-1">
-                        {daysOfWeek.map((day) => {
-                          const plan = getMealPlanForDayFromPlan(selectedPlanData, day);
-                          return (
-                            <div
-                              key={`history-detail-${day}`}
-                              className="rounded-xl border border-gray-200 bg-gray-50/60 p-4"
-                            >
-                              <p className="text-sm font-bold text-gray-900">{day}</p>
-                              {!plan ? (
-                                <p className="mt-2 text-sm text-gray-500">
-                                  No meals available.
-                                </p>
-                              ) : (
-                                <div className="mt-2 grid gap-2 text-sm text-gray-700">
-                                  <p>
-                                    <span className="font-semibold">Breakfast:</span>{" "}
-                                    {plan.breakfast || "N/A"}
-                                  </p>
-                                  <p>
-                                    <span className="font-semibold">Lunch:</span>{" "}
-                                    {plan.lunch || "N/A"}
-                                  </p>
-                                  <p>
-                                    <span className="font-semibold">Dinner:</span>{" "}
-                                    {plan.dinner || "N/A"}
-                                  </p>
-                                  {plan.snacks && (
-                                    <p>
-                                      <span className="font-semibold">Snacks:</span>{" "}
-                                      {plan.snacks}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                              Selected Week
+                            </p>
+                            <p className="text-base font-bold text-slate-900 mt-0.5">
+                              {selectedHistoryItem?.createdAt
+                                ? new Date(
+                                    selectedHistoryItem.createdAt
+                                  ).toLocaleString()
+                                : "Current Plan"}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {selectedHistoryItem?.dietType || "Balanced"} ·{" "}
+                              {selectedHistoryItem?.calories ?? "N/A"} kcal ·{" "}
+                              {selectedHistoryItem?.servingCount ??
+                                selectedPlanData.servingCount ??
+                                1}{" "}
+                              serving(s)
+                            </p>
+                            <div className="flex flex-wrap gap-3 mt-2 text-xs">
+                              <span className="font-bold text-emerald-700">
+                                Adherence {analyticsSummary.overallAdherence}%
+                              </span>
+                              <span className="text-slate-500">
+                                Calorie hit {analyticsSummary.calorieTargetHitRate}%
+                              </span>
+                              <span className="text-slate-500">
+                                Streak {analyticsSummary.currentDayStreak}d
+                              </span>
                             </div>
-                          );
-                        })}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("planner")}
+                            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition"
+                          >
+                            Open In Planner →
+                          </button>
+                        </div>
+
+                        <div className="max-h-[56vh] space-y-2.5 overflow-y-auto pr-1">
+                          {daysOfWeek.map((day) => {
+                            const plan = getMealPlanForDayFromPlan(
+                              selectedPlanData,
+                              day
+                            );
+                            return (
+                              <div
+                                key={`history-detail-${day}`}
+                                className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5"
+                              >
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2.5">
+                                  {day}
+                                </p>
+                                {!plan ? (
+                                  <p className="text-xs text-slate-400 italic">
+                                    No meals recorded.
+                                  </p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {[
+                                      {
+                                        icon: Coffee,
+                                        label: "Breakfast",
+                                        value: plan.breakfast,
+                                        accent: "border-l-amber-400",
+                                        iconBg: "bg-amber-50",
+                                        iconColor: "text-amber-500",
+                                      },
+                                      {
+                                        icon: Sun,
+                                        label: "Lunch",
+                                        value: plan.lunch,
+                                        accent: "border-l-emerald-400",
+                                        iconBg: "bg-emerald-50",
+                                        iconColor: "text-emerald-600",
+                                      },
+                                      {
+                                        icon: Moon,
+                                        label: "Dinner",
+                                        value: plan.dinner,
+                                        accent: "border-l-indigo-400",
+                                        iconBg: "bg-indigo-50",
+                                        iconColor: "text-indigo-500",
+                                      },
+                                      ...(plan.snacks
+                                        ? [
+                                            {
+                                              icon: Cookie,
+                                              label: "Snacks",
+                                              value: plan.snacks,
+                                              accent: "border-l-rose-400",
+                                              iconBg: "bg-rose-50",
+                                              iconColor: "text-rose-500",
+                                            },
+                                          ]
+                                        : []),
+                                    ].map(
+                                      ({
+                                        icon: MIcon,
+                                        label,
+                                        value,
+                                        accent,
+                                        iconBg,
+                                        iconColor,
+                                      }) => (
+                                        <div
+                                          key={label}
+                                          className={`flex items-start gap-2.5 border-l-4 ${accent} bg-white rounded-r-lg pl-3 py-2 pr-3`}
+                                        >
+                                          <div
+                                            className={`p-1 rounded-md ${iconBg} shrink-0`}
+                                          >
+                                            <MIcon
+                                              className={`w-3 h-3 ${iconColor}`}
+                                            />
+                                          </div>
+                                          <div className="min-w-0">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                                              {label}
+                                            </p>
+                                            <p className="text-xs text-slate-700 font-medium leading-snug mt-0.5">
+                                              {value || "—"}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      )
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
-            </section>
-          )}
+              </section>
+            )}
 
-          {activeTab === "grocery" && (
-            <section className="w-full rounded-3xl border border-emerald-100 bg-white/85 p-6 sm:p-8 shadow-sm space-y-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {/* ── GROCERY TAB ── */}
+            {activeTab === "grocery" && (
+              <section className="w-full rounded-2xl border border-slate-200 bg-white shadow-sm p-5 sm:p-6 space-y-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">
+                      Grocery Sync
+                    </h2>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                      Pull ingredients for the selected plan and serving size.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchGrocerySync}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Sync Now
+                  </button>
+                </div>
+
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Quick Grocery Sync</h2>
-                  <p className="text-sm text-gray-600">
-                    Pull ingredients for the selected plan and serving size.
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    Servings Multiplier
                   </p>
+                  <div className="flex gap-2">
+                    {[1, 2, 4, 6].map((count) => (
+                      <button
+                        key={`grocery-serving-${count}`}
+                        type="button"
+                        onClick={() => setServingCount(count)}
+                        className={`rounded-xl border px-4 py-2 text-sm font-bold transition-all ${
+                          servingCount === count
+                            ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                        }`}
+                      >
+                        {count}x
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={fetchGrocerySync}
-                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Sync Now
-                </button>
-              </div>
 
-              <div className="max-w-sm">
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Servings Multiplier
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[1, 2, 4, 6].map((count) => (
-                    <button
-                      key={`grocery-serving-${count}`}
-                      type="button"
-                      onClick={() => setServingCount(count)}
-                      className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                        servingCount === count
-                          ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                          : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      {count}x
-                    </button>
-                  ))}
-                </div>
-              </div>
+                {groceryWarning && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-500" />
+                    {groceryWarning}
+                  </div>
+                )}
 
-              {groceryWarning && (
-                <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  {groceryWarning}
-                </p>
-              )}
-
-              {isGroceryLoading ? (
-                <p className="text-sm text-gray-500">Syncing grocery list...</p>
-              ) : (
-                <GroceryList items={groceryItems} onDownload={handleDownloadGroceryPdf} />
-              )}
-            </section>
-          )}
+                {isGroceryLoading ? (
+                  <div className="flex items-center gap-3 py-8 justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
+                    <p className="text-sm text-slate-500">
+                      Syncing grocery list...
+                    </p>
+                  </div>
+                ) : (
+                  <GroceryList
+                    items={groceryItems}
+                    onDownload={handleDownloadGroceryPdf}
+                  />
+                )}
+              </section>
+            )}
           </div>
         </div>
       </main>

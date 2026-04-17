@@ -5,6 +5,7 @@ import { OpenAI } from "openai";
 import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { parseMealToStructured } from "@/types/mealplan";
+import { buildWeeklyMealPlanFromDb } from "@/lib/meal-plan-db";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -385,27 +386,6 @@ function normalizeWeeklyMealPlanForCompare(weeklyPlan: {
   });
 }
 
-function buildWeeklyMealPlanFromDb(days: Array<{
-  dayName: string;
-  items: Array<{ mealType: string; description: string }>;
-}>): { [day: string]: DailyMealPlan } {
-  const mealPlan: { [day: string]: DailyMealPlan } = {};
-
-  for (const day of days) {
-    const daily: DailyMealPlan = {};
-    for (const item of day.items) {
-      const key = item.mealType.toLowerCase();
-      if (key === "breakfast") daily.Breakfast = item.description;
-      if (key === "lunch") daily.Lunch = item.description;
-      if (key === "dinner") daily.Dinner = item.description;
-      if (key === "snacks" || key === "snack") daily.Snacks = item.description;
-    }
-    mealPlan[day.dayName] = daily;
-  }
-
-  return mealPlan;
-}
-
 async function persistMealPlan({
   userId,
   input,
@@ -566,9 +546,14 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  let userId: string | undefined;
   try {
     const clerkUser = await currentUser();
-    const userId = clerkUser?.id;
+    userId = clerkUser?.id;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // Extract parameters from the request body
     const input: MealPlanRequest = await request.json();
@@ -820,10 +805,9 @@ export async function POST(request: Request) {
     console.error("Error generating meal plan:", error);
     const { status, message } = getProviderErrorDetails(error);
     const fallbackPlan = buildFallbackMealPlan({});
-    const clerkUser = await currentUser();
-    if (clerkUser?.id) {
+    if (userId) {
       await safePersistMealPlan({
-        userId: clerkUser.id,
+        userId,
         input: {},
         mealPlan: fallbackPlan,
         source: "fallback",

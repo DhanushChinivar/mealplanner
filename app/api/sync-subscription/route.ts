@@ -22,11 +22,9 @@ export async function POST(req: NextRequest) {
     const paid = session.payment_status === "paid" || session.status === "complete";
 
     const currentUserEmail = clerkUser.emailAddresses?.[0]?.emailAddress ?? "";
-    const sameUser =
-      (metadataUserId && metadataUserId === clerkUser.id) ||
-      (email && currentUserEmail && email.toLowerCase() === currentUserEmail.toLowerCase());
 
-    if (!sameUser) {
+    // Require metadata userId match — email fallback is insecure
+    if (!metadataUserId || metadataUserId !== clerkUser.id) {
       return NextResponse.json(
         { error: "Session does not belong to the signed-in user." },
         { status: 403 }

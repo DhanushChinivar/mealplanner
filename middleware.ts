@@ -52,11 +52,10 @@ export default clerkMiddleware(async (auth, req) => {
     try {
       // Make a POST request to our internal API
       const checkSubRes = await fetch(
-        `${origin}/api/check-subscription?userId=${userId}`,
+        `${origin}/api/check-subscription`,
         {
           method: "GET",
           headers: {
-            // Forward cookies if needed for session checks
             cookie: req.headers.get("cookie") || "",
           },
         }

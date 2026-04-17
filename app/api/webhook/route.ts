@@ -25,19 +25,20 @@ export async function POST(request: NextRequest) {
         break;
       }
       case "invoice.payment_failed": {
-        const session = event.data.object as Stripe.Invoice;
-        await handleInvoicePaymentFailed(session);
+        const invoice = event.data.object as Stripe.Invoice;
+        await handleInvoicePaymentFailed(invoice);
         break;
       }
       case "customer.subscription.deleted": {
-        const session = event.data.object as Stripe.Subscription;
-        await handleCustomerSubscriptionDeleted(session);
+        const subscription = event.data.object as Stripe.Subscription;
+        await handleCustomerSubscriptionDeleted(subscription);
         break;
       }
       default:
         console.log(`Unhandled event type ${event.type}`);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error("Webhook handler error:", error);
     return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
   }
 
@@ -53,7 +54,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     return;
   }
 
-  const subscriptionId = session.subscription as string;
+  const subscriptionId = typeof session.subscription === "string"
+    ? session.subscription
+    : session.subscription?.id ?? null;
   if (!subscriptionId) {
     console.log("No subscription ID found in session.");
     return;
@@ -81,7 +84,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 }
 
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
-const subscriptionId = (invoice as any).subscription as string;
+  const sub = (invoice as Stripe.Invoice & { subscription?: string | Stripe.Subscription }).subscription;
+  const subscriptionId = typeof sub === "string" ? sub : sub?.id ?? null;
 
   if (!subscriptionId) {
     console.log("No subscription ID found in invoice.");

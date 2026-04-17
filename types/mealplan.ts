@@ -99,8 +99,7 @@ export function parseMealToStructured(
     lower.includes("oat");
 
   const baseCalories = type === "breakfast" ? 400 : type === "lunch" ? 550 : type === "dinner" ? 650 : 200;
-  const variance = Math.random() * 100 - 50;
-  const calories = Math.round(baseCalories + variance);
+  const calories = baseCalories;
 
   const proteinPercent = isHighProtein ? 35 : 25;
   const carbPercent = isHighCarb ? 50 : 40;
@@ -115,11 +114,11 @@ export function parseMealToStructured(
       protein: Math.round((calories * proteinPercent) / 100 / 4), // 4 cal per gram protein
       carbs: Math.round((calories * carbPercent) / 100 / 4), // 4 cal per gram carbs
       fats: Math.round((calories * fatPercent) / 100 / 9), // 9 cal per gram fat
-      fiber: Math.round(3 + Math.random() * 8),
+      fiber: type === "breakfast" ? 5 : type === "lunch" ? 7 : type === "dinner" ? 8 : 3,
       calories,
     },
     ingredients: extractIngredients(mealString),
-    prepTime: Math.round(15 + Math.random() * 30),
+    prepTime: type === "breakfast" ? 15 : type === "lunch" ? 20 : type === "dinner" ? 30 : 10,
     selected: true,
     portionMultiplier: 1,
   };

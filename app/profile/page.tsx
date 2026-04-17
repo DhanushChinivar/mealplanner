@@ -202,7 +202,7 @@ const currentPlan = availablePlans.find(
                       </p>
                       <p>
                         <strong>Status:</strong>{" "}
-                        {subscription.subscription.subscription_active
+                        {subscription.subscription.subscriptionActive
                           ? "ACTIVE"
                           : "INACTIVE"}
                       </p>

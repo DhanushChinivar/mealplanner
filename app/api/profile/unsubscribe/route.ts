@@ -19,25 +19,21 @@ export async function POST() {
       throw new Error("No active subscription found.");
     }
 
+    if (!profile.subscriptionActive) {
+      throw new Error("Subscription is already inactive.");
+    }
+
     const subscriptionId = profile.stripeSubscriptionId;
 
-    // Cancel the subscription in Stripe
+    // Cancel the subscription in Stripe at period end — user retains access until then
     const canceledSubscription = await stripe.subscriptions.update(
       subscriptionId,
-      {
-        cancel_at_period_end: true, // or false to cancel immediately
-      }
+      { cancel_at_period_end: true }
     );
 
-    // Update the record in the DB
-    await prisma.profile.update({
-      where: { userId: clerkUser.id },
-      data: {
-        subscriptionTier: null,
-        stripeSubscriptionId: null,
-        subscriptionActive: false,
-      },
-    });
+    // Do NOT clear stripeSubscriptionId or subscriptionActive here.
+    // The webhook (customer.subscription.deleted) will fire when the period ends
+    // and will then clear the subscription data in the DB.
 
     return NextResponse.json({ subscription: canceledSubscription });
   } catch (error: any) {

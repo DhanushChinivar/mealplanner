@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { currentUser } from "@clerk/nextjs/server";
 import { stripe } from "@/lib/stripe";
 import { getPriceIdFromType } from "@/lib/plans";
 
 export async function POST(request: NextRequest) {
   try {
-    const { planType, userId, email } = await request.json();
+    const clerkUser = await currentUser();
+    if (!clerkUser?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    if (!planType || !userId || !email) {
+    const { planType } = await request.json();
+
+    if (!planType) {
       return NextResponse.json(
-        { error: "Plan type, User ID, and Email are required." },
+        { error: "Plan type is required." },
         { status: 400 }
       );
     }
@@ -29,6 +35,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const email = clerkUser.emailAddresses?.[0]?.emailAddress ?? "";
+    const userId = clerkUser.id;
+
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -46,10 +55,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ url: session.url });
-  } catch (error: any) {
-    console.error("Checkout API Error:", error.message);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Internal Server Error";
+    console.error("Checkout API Error:", msg);
     return NextResponse.json(
-      { error: error.message || "Internal Server Error" },
+      { error: msg },
       { status: 500 }
     );
   }

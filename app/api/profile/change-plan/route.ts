@@ -19,6 +19,22 @@ export async function POST(request: Request) {
       );
     }
 
+    const allowedPlanTypes = ["week", "month", "year"];
+    if (!allowedPlanTypes.includes(newPlan)) {
+      return NextResponse.json(
+        { error: "Invalid plan type." },
+        { status: 400 }
+      );
+    }
+
+    const priceId = getPriceIdFromType(newPlan);
+    if (!priceId) {
+      return NextResponse.json(
+        { error: "Price ID for the selected plan not found." },
+        { status: 400 }
+      );
+    }
+
     // Fetch existing subscription
     const profile = await prisma.profile.findUnique({
       where: { userId: clerkUser.id },
@@ -44,7 +60,7 @@ export async function POST(request: Request) {
         items: [
           {
             id: subscriptionItemId,
-            price: getPriceIdFromType(newPlan),
+            price: priceId,
           },
         ],
         proration_behavior: "create_prorations",
