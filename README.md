@@ -15,9 +15,9 @@
   <p align="center">AI-powered meal planning with personalized nutrition, smart grocery lists, and subscription access.</p>
 
   <p align="center">
-    <a href="https://mealsforge.com">View Demo</a> ·
-    <a href="https://github.com/yourusername/mealplanner/issues">Report Bug</a> ·
-    <a href="https://github.com/yourusername/mealplanner/issues">Request Feature</a>
+    <a href="https://mealsforge.com">View Live Demo</a> ·
+    <a href="https://github.com/DhanushChinivar/mealplanner/issues">Report Bug</a> ·
+    <a href="https://github.com/DhanushChinivar/mealplanner/issues">Request Feature</a>
   </p>
 
 </div>
@@ -26,9 +26,11 @@
 
 ## About the Project
 
-MealsForge is a full-stack meal planning platform that generates personalized weekly meal plans based on diet goals, calories, allergies, and cuisine preferences. It also creates grocery lists, tracks meal adherence, and provides analytics to help users stay consistent.
+It started with a simple frustration — figuring out what to eat every week takes more time and mental energy than it should. So I built MealsForge: an AI-powered meal planner that takes your diet goals, calorie targets, allergies, and cuisine preferences, and hands you back a full week of meals in seconds.
 
-This is a student project built to explore modern full-stack patterns: AI generation, subscription gating, and a production-ready Next.js app with a PostgreSQL data layer.
+From there it grew into something more complete. It generates your grocery list automatically, lets you swap out individual meals you don't like, and tracks whether you actually followed through — with streaks, adherence stats, and a heatmap to keep you honest.
+
+Under the hood it's a full production stack: Next.js, PostgreSQL, Stripe subscriptions, Clerk auth, and OpenAI doing the heavy lifting. Built as a student project to go beyond tutorials and ship something real.
 
 ### Key highlights:
 - AI-generated weekly meal plans with meal swaps and serving adjustments
@@ -140,14 +142,6 @@ mealplanner/
 
 ---
 
-## License
-
-Distributed under the MIT License. See `LICENSE` for more information.
-
----
-
 ## Contact
 
-## Contact
-
-Dhanush Chinivar (mailto:dhanushchinivar@gmail.com) · [LinkedIn](https://www.linkedin.com/in/dhanush-chinivar/) · 
+Dhanush Chinivar · [dhanushchinivar@gmail.com](mailto:dhanushchinivar@gmail.com) · [LinkedIn](https://www.linkedin.com/in/dhanush-chinivar/)
