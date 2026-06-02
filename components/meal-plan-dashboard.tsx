@@ -1828,21 +1828,31 @@ export default function MealPlanDashboard() {
                                         "dinner",
                                         "snacks",
                                       ] as const
-                                    ).map((slot, i) => (
-                                      <span
-                                        key={slot}
-                                        title={`${["B", "L", "D", "S"][i]}: ${dayRow[slot]}`}
-                                        className={`w-6 h-6 rounded-md text-[9px] flex items-center justify-center font-black transition-colors ${
-                                          dayRow[slot] === "completed"
-                                            ? "bg-emerald-400 text-white"
-                                            : dayRow[slot] === "skipped"
-                                            ? "bg-slate-200 text-slate-500"
-                                            : "bg-slate-100 text-slate-300 border border-slate-200"
-                                        }`}
-                                      >
-                                        {["B", "L", "D", "S"][i]}
-                                      </span>
-                                    ))}
+                                    ).map((slot, i) => {
+                                      const nextStatus =
+                                        dayRow[slot] === "pending"
+                                          ? "completed"
+                                          : dayRow[slot] === "completed"
+                                          ? "skipped"
+                                          : "pending";
+                                      return (
+                                        <button
+                                          key={slot}
+                                          type="button"
+                                          title={`${["B", "L", "D", "S"][i]}: ${dayRow[slot]} — click to mark ${nextStatus}`}
+                                          onClick={() => handleSetMealStatus(dayRow.dayName, slot, nextStatus)}
+                                          className={`w-6 h-6 rounded-md text-[9px] flex items-center justify-center font-black transition-colors cursor-pointer hover:opacity-75 ${
+                                            dayRow[slot] === "completed"
+                                              ? "bg-emerald-400 text-white"
+                                              : dayRow[slot] === "skipped"
+                                              ? "bg-slate-200 text-slate-500"
+                                              : "bg-slate-100 text-slate-300 border border-slate-200"
+                                          }`}
+                                        >
+                                          {["B", "L", "D", "S"][i]}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               ))}
