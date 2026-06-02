@@ -26,11 +26,11 @@
 
 ## About the Project
 
-It started with a simple frustration — figuring out what to eat every week takes more time and mental energy than it should. So I built MealsForge: an AI-powered meal planner that takes your diet goals, calorie targets, allergies, and cuisine preferences, and hands you back a full week of meals in seconds.
+It started with a simple frustration figuring out what to eat every week takes more time and mental energy than it should. So I built MealsForge: an AI-powered meal planner that takes your diet goals, calorie targets, allergies, and cuisine preferences, and hands you back a full week of meals in seconds.
 
-From there it grew into something more complete. It generates your grocery list automatically, lets you swap out individual meals you don't like, and tracks whether you actually followed through — with streaks, adherence stats, and a heatmap to keep you honest.
+From there it grew into something more complete. It generates your grocery list automatically, lets you swap out individual meals you don't like, and tracks whether you actually followed through with streaks, adherence stats, and a heatmap to keep you honest.
 
-Under the hood it's a full production stack: Next.js, PostgreSQL, Stripe subscriptions, Clerk auth, and OpenAI doing the heavy lifting. Built as a student project to go beyond tutorials and ship something real.
+Under the hood it's a full production stack: Next.js, PostgreSQL, Stripe subscriptions, Clerk auth, and OpenAI doing the heavy lifting. 
 
 ### Key highlights:
 - AI-generated weekly meal plans with meal swaps and serving adjustments
