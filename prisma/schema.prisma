@@ -17,6 +17,13 @@ model Profile {
   stripeSubscriptionId String?  @unique
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+
+  // Health data
+  displayName         String?
+  age                 Int?
+  weightKg            Float?
+  heightCm            Float?
+  goal                String?
 }
 
 model MealPlan {

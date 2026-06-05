@@ -66,6 +66,7 @@ interface MealPlanResponse {
   allergies?: string;
   cuisine?: string;
   snacks?: boolean;
+  recommendedCalories?: number | null;
 }
 
 interface MealPlanHistoryItem {
@@ -666,6 +667,7 @@ export default function MealPlanDashboard() {
     useState<MealProgressResponse | null>(null);
   const [isProgressLoading, setIsProgressLoading] = useState(false);
   const [isLoadingInitialPlan, setIsLoadingInitialPlan] = useState(true);
+  const [recommendedCalories, setRecommendedCalories] = useState<number | null>(null);
   const [mealStatuses, setMealStatuses] = useState<
     NonNullable<MealLogResponse["statuses"]>
   >({});
@@ -706,7 +708,8 @@ export default function MealPlanDashboard() {
       setIsHighProtein(plan.dietType.includes("High-Protein"));
       setIsLowCarb(plan.dietType.includes("Low-Carb"));
     }
-    if (plan.calories) setCalories(plan.calories);
+    const calorieTarget = plan.calories || plan.recommendedCalories;
+    if (calorieTarget) setCalories(calorieTarget);
     if (plan.allergies !== undefined) setAllergies(plan.allergies);
     if (plan.cuisine !== undefined) setCuisine(plan.cuisine);
     if (typeof plan.snacks === "boolean") setSnacks(plan.snacks);
@@ -964,10 +967,13 @@ export default function MealPlanDashboard() {
         if (!response.ok) return;
         const data: MealPlanResponse = await response.json();
         if (!isMounted) return;
+        if (data?.recommendedCalories) setRecommendedCalories(data.recommendedCalories);
         if (data?.mealPlan) {
           setSelectedPlanData(data);
           setSelectedPlanId(data.id ?? null);
           loadFormFromPlan(data);
+        } else if (data?.recommendedCalories && !data?.mealPlan) {
+          setCalories(data.recommendedCalories);
         }
       } catch (error) {
         console.error("Failed to load latest meal plan:", error);
@@ -1221,49 +1227,77 @@ export default function MealPlanDashboard() {
             }`}
           >
             <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              {(
-                [
-                  { id: "planner", label: "Planner", icon: LayoutPanelLeft },
-                  { id: "history", label: "History", icon: History },
-                  { id: "grocery", label: "Grocery Sync", icon: ShoppingCart },
-                ] as const
-              ).map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setActiveTab(id)}
-                  className={`relative w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors border-b border-slate-100 last:border-0 ${
-                    activeTab === id
-                      ? "bg-emerald-50 text-emerald-700 font-semibold"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
-                  }`}
-                >
-                  {activeTab === id && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-emerald-500 rounded-r" />
-                  )}
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {label}
-                </button>
-              ))}
+              {/* Planner */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("planner")}
+                className={`relative w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors border-b border-slate-100 ${
+                  activeTab === "planner"
+                    ? "bg-emerald-50 text-emerald-700 font-semibold"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+                }`}
+              >
+                {activeTab === "planner" && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-emerald-500 rounded-r" />
+                )}
+                <LayoutPanelLeft className="h-4 w-4 shrink-0" />
+                Planner
+              </button>
 
+              {/* Planner sub-items */}
               {activeTab === "planner" && (
-                <div className="border-t border-slate-100 py-1">
+                <div className="border-b border-slate-100">
                   {(["plan", "analytics"] as const).map((section) => (
                     <button
                       key={section}
                       type="button"
                       onClick={() => scrollToPlannerSection(section)}
-                      className={`w-full pl-10 pr-3 py-2 text-left text-xs font-medium transition-colors ${
+                      className={`w-full flex items-center gap-2 pl-11 pr-3 py-2 text-left text-xs font-medium transition-colors ${
                         activePlannerSection === section
-                          ? "text-emerald-700 bg-emerald-50/70"
+                          ? "text-emerald-700 bg-emerald-50/80"
                           : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
                       }`}
                     >
+                      <span className={`w-1 h-1 rounded-full ${activePlannerSection === section ? "bg-emerald-500" : "bg-slate-300"}`} />
                       {section === "plan" ? "Weekly Plan" : "Analytics"}
                     </button>
                   ))}
                 </div>
               )}
+
+              {/* Grocery Sync */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("grocery")}
+                className={`relative w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors border-b border-slate-100 ${
+                  activeTab === "grocery"
+                    ? "bg-emerald-50 text-emerald-700 font-semibold"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+                }`}
+              >
+                {activeTab === "grocery" && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-emerald-500 rounded-r" />
+                )}
+                <ShoppingCart className="h-4 w-4 shrink-0" />
+                Grocery Sync
+              </button>
+
+              {/* History */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("history")}
+                className={`relative w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+                  activeTab === "history"
+                    ? "bg-emerald-50 text-emerald-700 font-semibold"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+                }`}
+              >
+                {activeTab === "history" && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-emerald-500 rounded-r" />
+                )}
+                <History className="h-4 w-4 shrink-0" />
+                History
+              </button>
             </div>
           </aside>
 
@@ -1367,6 +1401,11 @@ export default function MealPlanDashboard() {
                           {calories} kcal
                         </span>
                       </p>
+                      {recommendedCalories && recommendedCalories === calories && (
+                        <p className="text-[10px] text-emerald-500 font-medium">
+                          ✦ Calculated from your health profile
+                        </p>
+                      )}
                       <input
                         type="range"
                         min={1200}

@@ -508,19 +508,31 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
-    const latest = await prisma.mealPlan.findFirst({
-      where: { userId: clerkUser.id },
-      orderBy: { createdAt: "desc" },
-      include: {
-        days: {
-          orderBy: { dayOrder: "asc" },
-          include: { items: { orderBy: { sortOrder: "asc" } } },
+    const [latest, healthProfile] = await Promise.all([
+      prisma.mealPlan.findFirst({
+        where: { userId: clerkUser.id },
+        orderBy: { createdAt: "desc" },
+        include: {
+          days: {
+            orderBy: { dayOrder: "asc" },
+            include: { items: { orderBy: { sortOrder: "asc" } } },
+          },
         },
-      },
-    });
+      }),
+      prisma.profile.findUnique({
+        where: { userId: clerkUser.id },
+        select: { weightKg: true, heightCm: true, age: true, goal: true },
+      }),
+    ]);
+
+    let recommendedCalories: number | null = null;
+    if (healthProfile?.weightKg && healthProfile?.heightCm && healthProfile?.age) {
+      const tdee = calcTDEE(healthProfile.weightKg, healthProfile.heightCm, healthProfile.age);
+      recommendedCalories = targetCaloriesFromGoal(tdee, healthProfile.goal);
+    }
 
     if (!latest) {
-      return NextResponse.json({ mealPlan: null, source: "none" });
+      return NextResponse.json({ mealPlan: null, source: "none", recommendedCalories });
     }
 
     return NextResponse.json({
@@ -535,6 +547,7 @@ export async function GET() {
       allergies: latest.allergies ?? "",
       cuisine: latest.cuisine ?? "",
       snacks: latest.snacks ?? false,
+      recommendedCalories,
     });
   } catch (error) {
     console.error("Error fetching latest meal plan:", error);
@@ -542,6 +555,22 @@ export async function GET() {
       { error: "Failed to fetch latest meal plan." },
       { status: 500 }
     );
+  }
+}
+
+function calcTDEE(weightKg: number, heightCm: number, age: number): number {
+  // Mifflin-St Jeor (gender-neutral midpoint)
+  const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 78;
+  return Math.round(bmr * 1.4); // sedentary-to-light activity
+}
+
+function targetCaloriesFromGoal(tdee: number, goal?: string | null): number {
+  switch (goal) {
+    case "Lose Weight":    return Math.max(1200, tdee - 500);
+    case "Gain Muscle":    return tdee + 300;
+    case "Maintain Weight":
+    case "Eat Healthier":
+    default:               return tdee;
   }
 }
 
@@ -559,7 +588,6 @@ export async function POST(request: Request) {
     const input: MealPlanRequest = await request.json();
     const {
       dietType,
-      calories,
       allergies,
       cuisine,
       snacks = false,
@@ -568,6 +596,22 @@ export async function POST(request: Request) {
       swapMealType,
       baseMealPlan,
     } = input;
+
+    // Fetch health profile and calculate calorie target
+    const healthProfile = await prisma.profile.findUnique({
+      where: { userId },
+      select: { weightKg: true, heightCm: true, age: true, goal: true },
+    });
+
+    let calories = input.calories;
+    let healthContext = "";
+
+    if (healthProfile?.weightKg && healthProfile?.heightCm && healthProfile?.age) {
+      const tdee = calcTDEE(healthProfile.weightKg, healthProfile.heightCm, healthProfile.age);
+      const target = targetCaloriesFromGoal(tdee, healthProfile.goal);
+      if (!calories) calories = target;
+      healthContext = `The user's goal is "${healthProfile.goal ?? "Eat Healthier"}". Their calculated daily calorie target is ${target} kcal (TDEE: ${tdee} kcal). `;
+    }
 
     const fallbackPlan = buildFallbackMealPlan({
       dietType,
@@ -632,11 +676,12 @@ export async function POST(request: Request) {
         : createOpenRouterClient(OPENROUTER_API_KEY as string);
 
     const prompt = `
-      You are a professional nutritionist. Create a 7-day meal plan for a household of ${normalizeServingCount(servingCount)} serving(s) following a ${dietType} diet aiming for ${calories} calories per person per day.
-      
+      You are a professional nutritionist. ${healthContext}Create a 7-day meal plan for a household of ${normalizeServingCount(servingCount)} serving(s) following a ${dietType || "balanced"} diet aiming for ${asCalories(calories)} calories per person per day.
+
       Allergies or restrictions: ${allergies || "none"}.
       Preferred cuisine: ${cuisine || "no preference"}.
       Snacks included: ${snacks ? "yes" : "no"}.
+      ${healthProfile?.goal ? `User goal: ${healthProfile.goal}. Tailor the meals to support this goal.` : ""}
       
       For each day, provide:
         - Breakfast
