@@ -313,8 +313,8 @@ export default function HomePage() {
               <div className="mt-8 grid sm:grid-cols-2 gap-4">
                 <div className="relative h-44 rounded-2xl overflow-hidden border border-emerald-200 bg-white">
                   <img
-                    src="https://images.unsplash.com/photo-1528715471579-d1bcf0ba5e83?w=1200&auto=format&fit=crop&q=80"
-                    alt="Husband and wife cooking together"
+                    src="https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1200&auto=format&fit=crop&q=80"
+                    alt="Couple cooking together in kitchen"
                     className="absolute inset-0 h-full w-full object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
