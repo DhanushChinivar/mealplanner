@@ -17,6 +17,7 @@ const isPublicRoute = createRouteMatcher([
 const isMealPlanRoute = createRouteMatcher(["/mealplan(.*)"]);
 const isProfileRoute = createRouteMatcher(["/profile(.*)"]);
 const isSignUpRoute = createRouteMatcher(["/sign-up(.*)"]);
+const isSubscribeRoute = createRouteMatcher(["/subscribe"]);
 
 const TRIAL_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -42,6 +43,36 @@ export default clerkMiddleware(async (auth, req) => {
 
   if (isSignUpRoute(req) && userId) {
     return NextResponse.redirect(new URL("/mealplan", origin));
+  }
+
+  if (isSubscribeRoute(req) && userId) {
+    const meta = (sessionClaims?.publicMetadata ?? {}) as {
+      subscriptionActive?: boolean;
+      subscriptionTier?: string | null;
+    };
+    const metaPopulated =
+      meta.subscriptionActive !== undefined || meta.subscriptionTier !== undefined;
+
+    if (metaPopulated) {
+      if (hasAccess(meta)) {
+        return NextResponse.redirect(new URL("/mealplan", origin));
+      }
+    } else {
+      try {
+        const { clerkClient } = await import("@clerk/nextjs/server");
+        const client = await clerkClient();
+        const user = await client.users.getUser(userId);
+        const freshMeta = user.publicMetadata as {
+          subscriptionActive?: boolean;
+          subscriptionTier?: string | null;
+        };
+        if (hasAccess(freshMeta)) {
+          return NextResponse.redirect(new URL("/mealplan", origin));
+        }
+      } catch {
+        // fall through and show subscribe page
+      }
+    }
   }
 
   if ((isMealPlanRoute(req) || isProfileRoute(req)) && userId) {

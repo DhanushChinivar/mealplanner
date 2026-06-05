@@ -18,6 +18,10 @@ async function createProfileRequest() {
       "Content-Type": "application/json",
     },
   });
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("Unexpected response from server");
+  }
   const data = await response.json();
   return data as ApiResponse;
 }
@@ -31,7 +35,8 @@ export default function CreateProfile() {
         router.push("/subscribe");
     },
     onError: (error) => {
-      console.error("Error creating profile:", error);          
+      console.error("Error creating profile:", error);
+      router.push("/subscribe");
     },
 });
   useEffect(() => {

@@ -161,7 +161,7 @@ function PlanIcon({ interval }: { interval: string }) {
 }
 
 export default function SubscribePage() {
-  const { user } = useUser();
+  const { user, isLoaded: clerkLoaded } = useUser();
   const router = useRouter();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [trialInfo, setTrialInfo] = useState<SubscriptionCheckResponse | null>(
@@ -198,7 +198,12 @@ export default function SubscribePage() {
   };
 
   useEffect(() => {
-    void fetchTrialInfo();
+    if (!userId) return;
+    void fetchTrialInfo().then((data) => {
+      if (data?.hasAccess) {
+        router.replace("/mealplan");
+      }
+    });
   }, [userId]);
 
   const mutation = useMutation<SubscribeResponse, Error, { planType: string }>({
@@ -302,6 +307,14 @@ export default function SubscribePage() {
     }
     mutation.mutate({ planType });
   };
+
+  if (!clerkLoaded || (clerkLoaded && userId && trialLoading)) {
+    return (
+      <div className="min-h-screen bg-[#f7fbf9] flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f7fbf9]">
