@@ -51,15 +51,32 @@ interface ProviderError {
   error?: { message?: string };
 }
 
+interface StructuredMealItem {
+  name: string;
+  description: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber?: number;
+  prepTime?: number;
+  ingredients: Array<{
+    name: string;
+    amount: number;
+    unit: string;
+    category: string;
+  }>;
+}
+
 interface DailyMealPlan {
-  Breakfast?: string;
-  Lunch?: string;
-  Dinner?: string;
-  Snacks?: string;
-  breakfast?: string;
-  lunch?: string;
-  dinner?: string;
-  snacks?: string;
+  Breakfast?: string | StructuredMealItem;
+  Lunch?: string | StructuredMealItem;
+  Dinner?: string | StructuredMealItem;
+  Snacks?: string | StructuredMealItem;
+  breakfast?: string | StructuredMealItem;
+  lunch?: string | StructuredMealItem;
+  dinner?: string | StructuredMealItem;
+  snacks?: string | StructuredMealItem;
 }
 
 interface MealPlanRequest {
@@ -231,16 +248,11 @@ function buildFallbackMealPlan({
   return plan;
 }
 
-function normalizeDayMealPlan(plan?: DailyMealPlan & {
-  breakfast?: string;
-  lunch?: string;
-  dinner?: string;
-  snacks?: string;
-}): {
-  breakfast?: string;
-  lunch?: string;
-  dinner?: string;
-  snacks?: string;
+function normalizeDayMealPlan(plan?: DailyMealPlan): {
+  breakfast?: string | StructuredMealItem;
+  lunch?: string | StructuredMealItem;
+  dinner?: string | StructuredMealItem;
+  snacks?: string | StructuredMealItem;
 } {
   if (!plan) return {};
   return {
@@ -258,27 +270,46 @@ function normalizeWeeklyMealPlanForDb(weeklyPlan: {
     .map(([dayName, dayPlan]) => {
       const normalized = normalizeDayMealPlan(dayPlan);
       const items = Object.entries(normalized)
-        .filter(([, description]) => Boolean(description))
-        .map(([mealType, description]) => ({
-          mealType,
-          description: String(description),
-          sortOrder: MEAL_ORDER[mealType] ?? 99,
-        }))
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map(({ mealType, description }, mealIndex) => {
+        .filter(([, meal]) => Boolean(meal))
+        .map(([mealType, meal], mealIndex) => {
+          const sortOrder = MEAL_ORDER[mealType] ?? 99;
+
+          if (typeof meal === "object" && meal !== null) {
+            return {
+              mealType,
+              sortOrder,
+              name: meal.name,
+              description: meal.description,
+              calories: meal.calories,
+              protein: meal.protein,
+              carbs: meal.carbs,
+              fats: meal.fats,
+              fiber: meal.fiber ?? null,
+              prepTime: meal.prepTime ?? null,
+              selected: true,
+              portionMultiplier: 1,
+              ingredients: (meal.ingredients ?? []).map((ing) => ({
+                name: ing.name,
+                amount: ing.amount,
+                unit: ing.unit,
+                category: ing.category,
+              })),
+            };
+          }
+
+          // Fallback path for string descriptions (fallback plan)
+          const description = String(meal);
           const normalizedMealType = mealType.toLowerCase();
-          const parseType =
-            normalizedMealType === "snacks" ? "snack" : normalizedMealType;
+          const parseType = normalizedMealType === "snacks" ? "snack" : normalizedMealType;
           const structuredMeal = parseMealToStructured(
             description,
             parseType as "breakfast" | "lunch" | "dinner" | "snack",
             DAY_ORDER[dayName] ?? 99,
             mealIndex
           );
-
           return {
             mealType,
-            sortOrder: MEAL_ORDER[mealType] ?? 99,
+            sortOrder,
             name: structuredMeal.name,
             description,
             calories: structuredMeal.macros.calories,
@@ -287,11 +318,12 @@ function normalizeWeeklyMealPlanForDb(weeklyPlan: {
             fats: structuredMeal.macros.fats,
             fiber: structuredMeal.macros.fiber ?? null,
             prepTime: structuredMeal.prepTime ?? null,
-            selected: structuredMeal.selected !== false,
-            portionMultiplier: structuredMeal.portionMultiplier ?? 1,
+            selected: true,
+            portionMultiplier: 1,
             ingredients: structuredMeal.ingredients,
           };
-        });
+        })
+        .sort((a, b) => a.sortOrder - b.sortOrder);
 
       return {
         dayName,
@@ -371,6 +403,12 @@ function normalizeInputForCompare(input: MealPlanRequest) {
   };
 }
 
+function mealKey(meal: string | StructuredMealItem | undefined): string {
+  if (!meal) return "";
+  if (typeof meal === "object") return meal.name.trim();
+  return meal.trim();
+}
+
 function normalizeWeeklyMealPlanForCompare(weeklyPlan: {
   [day: string]: DailyMealPlan;
 }) {
@@ -378,10 +416,10 @@ function normalizeWeeklyMealPlanForCompare(weeklyPlan: {
     const day = normalizeDayMealPlan(weeklyPlan[dayName] ?? {});
     return {
       dayName,
-      breakfast: (day.breakfast ?? "").trim(),
-      lunch: (day.lunch ?? "").trim(),
-      dinner: (day.dinner ?? "").trim(),
-      snacks: (day.snacks ?? "").trim(),
+      breakfast: mealKey(day.breakfast),
+      lunch: mealKey(day.lunch),
+      dinner: mealKey(day.dinner),
+      snacks: mealKey(day.snacks),
     };
   });
 }
@@ -675,42 +713,58 @@ export async function POST(request: Request) {
         ? createOpenAIClient(OPENAI_API_KEY as string)
         : createOpenRouterClient(OPENROUTER_API_KEY as string);
 
-    const prompt = `
-      You are a professional nutritionist. ${healthContext}Create a 7-day meal plan for a household of ${normalizeServingCount(servingCount)} serving(s) following a ${dietType || "balanced"} diet aiming for ${asCalories(calories)} calories per person per day.
+    const targetCals = asCalories(calories);
+    const breakfastCals = Math.round(targetCals * 0.25);
+    const lunchCals = Math.round(targetCals * 0.35);
+    const dinnerCals = Math.round(targetCals * 0.35);
+    const snackCals = Math.round(targetCals * 0.05);
+    const servings = normalizeServingCount(servingCount);
 
-      Allergies or restrictions: ${allergies || "none"}.
-      Preferred cuisine: ${cuisine || "no preference"}.
-      Snacks included: ${snacks ? "yes" : "no"}.
-      ${healthProfile?.goal ? `User goal: ${healthProfile.goal}. Tailor the meals to support this goal.` : ""}
-      
-      For each day, provide:
-        - Breakfast
-        - Lunch
-        - Dinner
-        ${snacks ? "- Snacks" : ""}
-      
-      Use simple ingredients and provide brief instructions. Include approximate calorie counts for each meal.
-      
-      Structure the response as a JSON object where each day is a key, and each meal (breakfast, lunch, dinner, snacks) is a sub-key. Example:
-      
-      {
-        "Monday": {
-          "Breakfast": "Oatmeal with fruits - 350 calories",
-          "Lunch": "Grilled chicken salad - 500 calories",
-          "Dinner": "Steamed vegetables with quinoa - 600 calories",
-          "Snacks": "Greek yogurt - 150 calories"
-        },
-        "Tuesday": {
-          "Breakfast": "Smoothie bowl - 300 calories",
-          "Lunch": "Turkey sandwich - 450 calories",
-          "Dinner": "Baked salmon with asparagus - 700 calories",
-          "Snacks": "Almonds - 200 calories"
-        }
-        // ...and so on for each day
-      }
+    const prompt = `You are a professional nutritionist and chef.
 
-      Return just the json with no extra commentaries and no backticks.
-    `;
+User profile:
+- Daily calorie target: ${targetCals} kcal per person
+- Goal: ${healthProfile?.goal || "Eat Healthier"}
+${healthContext}- Diet: ${dietType || "balanced"}
+- Allergies/restrictions: ${allergies || "none"}
+- Preferred cuisine: ${cuisine || "no preference"}
+- Servings per meal: ${servings}
+- Include snacks: ${snacks ? "yes" : "no"}
+
+Create a 7-day meal plan (Monday through Sunday). Return ONLY a valid JSON object — no markdown, no backticks, no extra text — using this exact structure for every day:
+
+{
+  "Monday": {
+    "Breakfast": {
+      "name": "Meal name",
+      "description": "1-2 sentence cooking instructions",
+      "calories": <integer per person>,
+      "protein": <grams per person>,
+      "carbs": <grams per person>,
+      "fats": <grams per person>,
+      "fiber": <grams per person>,
+      "prepTime": <integer minutes>,
+      "ingredients": [
+        { "name": "Ingredient", "amount": <number per serving>, "unit": "g|ml|pcs|tbsp|tsp|cups", "category": "proteins|produce|grains|dairy|spices|other" }
+      ]
+    },
+    "Lunch": { ... },
+    "Dinner": { ... }${snacks ? ',\n    "Snacks": { ... }' : ""}
+  }
+}
+
+Calorie targets per person per day:
+- Breakfast: ~${breakfastCals} kcal
+- Lunch: ~${lunchCals} kcal
+- Dinner: ~${dinnerCals} kcal${snacks ? `\n- Snacks: ~${snackCals} kcal` : ""}
+- Total: ~${targetCals} kcal
+
+Rules:
+- All calories, macros, and ingredient amounts are per single serving (per person)
+- Ingredient amounts scale with servings count of ${servings} when shopping, but nutritional values are always per person
+- Vary meals across all 7 days — no repeated meals
+- Match ${cuisine || "a balanced international"} cuisine style throughout
+- Tailor macro ratios to support the "${healthProfile?.goal || "Eat Healthier"}" goal`;
 
     let aiContent = "";
     let lastProviderStatus: number | undefined;
@@ -729,7 +783,7 @@ export async function POST(request: Request) {
               },
             ],
             temperature: 0.7,
-            max_tokens: 1500,
+            max_tokens: 4000,
           });
 
           aiContent = response.choices?.[0]?.message?.content?.trim() ?? "";

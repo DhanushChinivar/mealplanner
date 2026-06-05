@@ -27,17 +27,6 @@ export interface Ingredient {
   category: "produce" | "proteins" | "grains" | "dairy" | "spices" | "other";
 }
 
-export interface DailyMealPlan {
-  breakfast?: Meal;
-  lunch?: Meal;
-  dinner?: Meal;
-  snacks?: Meal[];
-}
-
-export interface WeeklyMealPlan {
-  [day: string]: DailyMealPlan;
-}
-
 export interface GroceryItem {
   name: string;
   totalAmount: number;
@@ -57,26 +46,7 @@ export interface UserPreferences {
   isLowCarb: boolean;
 }
 
-// Helper to calculate total macros from meals
-export function calculateTotalMacros(meals: (Meal | undefined)[]): MacroNutrients {
-  const validMeals = meals.filter((m): m is Meal => m !== undefined && m.selected !== false);
-
-  return validMeals.reduce(
-    (acc, meal) => {
-      const multiplier = meal.portionMultiplier ?? 1;
-      return {
-        protein: acc.protein + meal.macros.protein * multiplier,
-        carbs: acc.carbs + meal.macros.carbs * multiplier,
-        fats: acc.fats + meal.macros.fats * multiplier,
-        fiber: (acc.fiber ?? 0) + (meal.macros.fiber ?? 0) * multiplier,
-        calories: acc.calories + meal.macros.calories * multiplier,
-      };
-    },
-    { protein: 0, carbs: 0, fats: 0, fiber: 0, calories: 0 }
-  );
-}
-
-// Parse meal string to structured Meal object with estimated macros
+// Parse meal string to structured Meal object with estimated macros (fallback only)
 export function parseMealToStructured(
   mealString: string,
   type: Meal["type"],
@@ -178,33 +148,3 @@ function extractIngredients(mealString: string): Ingredient[] {
   return ingredients;
 }
 
-// Aggregate ingredients for grocery list
-export function aggregateGroceryList(weeklyPlan: WeeklyMealPlan): GroceryItem[] {
-  const aggregated: Record<string, GroceryItem> = {};
-
-  Object.values(weeklyPlan).forEach((day) => {
-    const meals = [day.breakfast, day.lunch, day.dinner, ...(day.snacks || [])].filter(Boolean) as Meal[];
-
-    meals.forEach((meal) => {
-      meal.ingredients.forEach((ingredient) => {
-        const key = `${ingredient.name.toLowerCase()}-${ingredient.unit}`;
-        if (aggregated[key]) {
-          aggregated[key].totalAmount += ingredient.amount;
-        } else {
-          aggregated[key] = {
-            name: ingredient.name,
-            totalAmount: ingredient.amount,
-            unit: ingredient.unit,
-            category: ingredient.category,
-            checked: false,
-          };
-        }
-      });
-    });
-  });
-
-  return Object.values(aggregated).sort((a, b) => {
-    const categoryOrder = ["proteins", "produce", "grains", "dairy", "spices", "other"];
-    return categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category);
-  });
-}
