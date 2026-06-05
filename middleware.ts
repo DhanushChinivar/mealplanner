@@ -7,7 +7,7 @@ const isPublicRoute = createRouteMatcher([
   "/subscribe(.*)",
   "/subscribe/success(.*)",
   "/api/checkout(.*)",
-  "/api/stripe-webhook(.*)",
+  "/api/stripe-webhook(.*)", // stripe payment event webhook
   "/api/check-subscription(.*)",
   "/api/start-trial(.*)",
   "/api/sync-subscription(.*)",
@@ -21,6 +21,7 @@ const isSubscribeRoute = createRouteMatcher(["/subscribe"]);
 
 const TRIAL_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
+//JWT Tokens by clerk
 function hasAccess(meta: { subscriptionActive?: boolean; subscriptionTier?: string | null }): boolean {
   if (meta.subscriptionActive) return true;
   if (meta.subscriptionTier?.startsWith("trial|")) {

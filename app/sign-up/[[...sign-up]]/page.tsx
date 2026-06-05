@@ -5,7 +5,7 @@ export default function Page() {
     <div className="min-h-screen bg-[#f7fbf9]">
       <div className="w-full max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-16 2xl:px-20 py-12 sm:py-16 lg:py-20 flex justify-center items-start">
         <SignUp
-          signInFallbackRedirectUrl="/create-profile"
+          signInFallbackRedirectUrl="/subscribe"
           appearance={{
             elements: {
               card: "w-full max-w-[560px] shadow-xl border border-emerald-100 rounded-2xl",
