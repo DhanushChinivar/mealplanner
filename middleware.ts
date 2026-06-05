@@ -1,8 +1,6 @@
-// app/middleware.ts
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-// 1. Define your "public" routes that do NOT require authentication
 const isPublicRoute = createRouteMatcher([
   "/",
   "/sign-up(.*)",
@@ -16,77 +14,77 @@ const isPublicRoute = createRouteMatcher([
   "/api/webhook(.*)",
 ]);
 
-// 2. Define a route group for Meal Plan. We want to check subscription
 const isMealPlanRoute = createRouteMatcher(["/mealplan(.*)"]);
-
-// 3. Define a route group for Profile Routes (Protected but may not require subscription)
 const isProfileRoute = createRouteMatcher(["/profile(.*)"]);
-
 const isSignUpRoute = createRouteMatcher(["/sign-up(.*)"]);
 
-// Clerk's middleware
+const TRIAL_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+function hasAccess(meta: { subscriptionActive?: boolean; subscriptionTier?: string | null }): boolean {
+  if (meta.subscriptionActive) return true;
+  if (meta.subscriptionTier?.startsWith("trial|")) {
+    const trialStart = new Date(meta.subscriptionTier.split("|")[1] ?? "");
+    if (!isNaN(trialStart.getTime())) {
+      return trialStart.getTime() + TRIAL_DAYS_MS > Date.now();
+    }
+  }
+  return false;
+}
+
 export default clerkMiddleware(async (auth, req) => {
   const userAuth = await auth();
-  const { userId } = userAuth;
-  const { pathname, origin } = req.nextUrl;
+  const { userId, sessionClaims } = userAuth;
+  const { origin } = req.nextUrl;
 
-  console.log("Middleware Info", userId, pathname, origin);
-
-  // If it's the check-subscription route, skip logic to avoid loops
-  if (pathname === "/api/check-subscription") {
-    return NextResponse.next();
-  }
-
-  // If route is NOT public & user not signed in → redirect to /sign-up
   if (!isPublicRoute(req) && !userId) {
     return NextResponse.redirect(new URL("/sign-up", origin));
   }
 
-  // If user is signed in and visits /sign-up → redirect to mealplan
   if (isSignUpRoute(req) && userId) {
     return NextResponse.redirect(new URL("/mealplan", origin));
   }
 
-  // If route is mealplan or profile → check subscription via the API route
   if ((isMealPlanRoute(req) || isProfileRoute(req)) && userId) {
-    try {
-      // Make a POST request to our internal API
-      const checkSubRes = await fetch(
-        `${origin}/api/check-subscription`,
-        {
-          method: "GET",
-          headers: {
-            cookie: req.headers.get("cookie") || "",
-          },
-        }
-      );
+    const meta = (sessionClaims?.publicMetadata ?? {}) as {
+      subscriptionActive?: boolean;
+      subscriptionTier?: string | null;
+    };
 
-      // Then parse JSON
-      if (checkSubRes.ok) {
-        const data = await checkSubRes.json();
-        if (!data.hasAccess) {
-          return NextResponse.redirect(new URL("/subscribe", origin));
-        }
-      } else {
-        // handle error
+    // Fast path: subscription fields are present in the JWT — no network hop needed.
+    // Fall back to Clerk's API only for existing users whose metadata hasn't been
+    // populated yet (pre-migration). Once all users have gone through a subscription
+    // event, this branch becomes unreachable.
+    const metaPopulated =
+      meta.subscriptionActive !== undefined || meta.subscriptionTier !== undefined;
+
+    if (metaPopulated) {
+      if (!hasAccess(meta)) {
         return NextResponse.redirect(new URL("/subscribe", origin));
       }
-    } catch (error) {
-      console.error("Error calling /api/check-subscription:", error);
-      return NextResponse.redirect(new URL("/subscribe", origin));
+    } else {
+      try {
+        const { clerkClient } = await import("@clerk/nextjs/server");
+        const client = await clerkClient();
+        const user = await client.users.getUser(userId);
+        const freshMeta = user.publicMetadata as {
+          subscriptionActive?: boolean;
+          subscriptionTier?: string | null;
+        };
+        if (!hasAccess(freshMeta)) {
+          return NextResponse.redirect(new URL("/subscribe", origin));
+        }
+      } catch {
+        return NextResponse.redirect(new URL("/subscribe", origin));
+      }
     }
   }
 
-  // Otherwise allow the request
   return NextResponse.next();
 });
 
-// 4. Next.js route matching config
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    // Always run for API routes
     "/(api|trpc)(.*)",
   ],
 };

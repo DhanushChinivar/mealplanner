@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser, clerkClient } from "@clerk/nextjs/server";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 
@@ -53,6 +53,18 @@ export async function POST(req: NextRequest) {
         subscriptionTier: session.metadata?.planType ?? null,
       },
     });
+
+    try {
+      const client = await clerkClient();
+      await client.users.updateUser(clerkUser.id, {
+        publicMetadata: {
+          subscriptionActive: true,
+          subscriptionTier: session.metadata?.planType ?? null,
+        },
+      });
+    } catch (error) {
+      console.error("Error updating Clerk publicMetadata on sync:", error);
+    }
 
     return NextResponse.json({ subscriptionActive: true });
   } catch (error: any) {

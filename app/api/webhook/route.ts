@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
+import { clerkClient } from "@clerk/nextjs/server";
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
@@ -62,24 +63,34 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     return;
   }
 
+  const planType = session.metadata?.planType ?? null;
   try {
     await prisma.profile.upsert({
       where: { userId },
       update: {
         stripeSubscriptionId: subscriptionId,
         subscriptionActive: true,
-        subscriptionTier: session.metadata?.planType || null,
+        subscriptionTier: planType,
       },
       create: {
         userId,
         email: customerEmail,
         stripeSubscriptionId: subscriptionId,
         subscriptionActive: true,
-        subscriptionTier: session.metadata?.planType || null,
+        subscriptionTier: planType,
       },
     });
   } catch (error) {
     console.log("Error updating user subscription in DB:", error);
+  }
+
+  try {
+    const client = await clerkClient();
+    await client.users.updateUser(userId, {
+      publicMetadata: { subscriptionActive: true, subscriptionTier: planType },
+    });
+  } catch (error) {
+    console.error("Error updating Clerk publicMetadata on checkout:", error);
   }
 }
 
@@ -121,6 +132,15 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   } catch (error) {
     console.log("Error updating user subscription in DB:", error);
   }
+
+  try {
+    const client = await clerkClient();
+    await client.users.updateUser(userId, {
+      publicMetadata: { subscriptionActive: false },
+    });
+  } catch (error) {
+    console.error("Error updating Clerk publicMetadata on payment failure:", error);
+  }
 }
 
 async function handleCustomerSubscriptionDeleted(subscription: Stripe.Subscription) {
@@ -160,5 +180,14 @@ async function handleCustomerSubscriptionDeleted(subscription: Stripe.Subscripti
     });
   } catch (error) {
     console.log("Error updating user subscription in DB:", error);
+  }
+
+  try {
+    const client = await clerkClient();
+    await client.users.updateUser(userId, {
+      publicMetadata: { subscriptionActive: false, subscriptionTier: null },
+    });
+  } catch (error) {
+    console.error("Error updating Clerk publicMetadata on subscription deleted:", error);
   }
 }

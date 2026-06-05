@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser, clerkClient } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 
 const TRIAL_DAYS = 7;
@@ -65,6 +65,15 @@ export async function POST() {
         where: { userId: clerkUser.id },
         data: { subscriptionTier: trialTier },
       });
+    }
+
+    try {
+      const client = await clerkClient();
+      await client.users.updateUser(clerkUser.id, {
+        publicMetadata: { subscriptionActive: false, subscriptionTier: trialTier },
+      });
+    } catch (error) {
+      console.error("Error updating Clerk publicMetadata on trial start:", error);
     }
 
     return NextResponse.json({

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser, clerkClient } from "@clerk/nextjs/server";
 import { getPriceIdFromType } from "@/lib/plans";
 
 export async function POST(request: Request) {
@@ -76,6 +76,15 @@ export async function POST(request: Request) {
         subscriptionActive: true,
       },
     });
+
+    try {
+      const client = await clerkClient();
+      await client.users.updateUser(clerkUser.id, {
+        publicMetadata: { subscriptionActive: true, subscriptionTier: newPlan },
+      });
+    } catch (error) {
+      console.error("Error updating Clerk publicMetadata on plan change:", error);
+    }
 
     return NextResponse.json({ subscription: updatedSubscription });
   } catch (error: any) {
