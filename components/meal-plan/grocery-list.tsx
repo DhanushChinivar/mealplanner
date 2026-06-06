@@ -52,12 +52,14 @@ export function GroceryList({ items, onDownload }: GroceryListProps) {
     });
   };
 
-  // Group items by category
+  // Group items by category, deduplicating by name within each category
   const groupedItems = safeItems.reduce((acc, item) => {
     if (!acc[item.category]) {
       acc[item.category] = [];
     }
-    acc[item.category].push(item);
+    if (!acc[item.category].some((i) => i.name === item.name)) {
+      acc[item.category].push(item);
+    }
     return acc;
   }, {} as Record<Ingredient['category'], GroceryItem[]>);
 
