@@ -38,15 +38,34 @@ import {
   Trash2,
 } from "lucide-react";
 
+interface StructuredMeal {
+  name: string;
+  description: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+  prepTime: number;
+  ingredients: Array<{ name: string; amount: number; unit: string; category: string }>;
+}
+
+type MealValue = StructuredMeal | string;
+
+function mealName(meal?: MealValue): string {
+  if (!meal) return "";
+  return typeof meal === "object" ? meal.name : meal;
+}
+
 interface DailyMealPlan {
-  breakfast?: string;
-  lunch?: string;
-  dinner?: string;
-  snacks?: string;
-  Breakfast?: string;
-  Lunch?: string;
-  Dinner?: string;
-  Snacks?: string;
+  breakfast?: MealValue;
+  lunch?: MealValue;
+  dinner?: MealValue;
+  snacks?: MealValue;
+  Breakfast?: MealValue;
+  Lunch?: MealValue;
+  Dinner?: MealValue;
+  Snacks?: MealValue;
 }
 
 interface WeeklyMealPlan {
@@ -263,25 +282,18 @@ const MealCard = ({
   onSetStatus,
 }: {
   type: string;
-  meal?: string;
+  meal?: MealValue;
   icon: ElementType;
   gradient?: string;
   onRegenerate?: () => void;
   mealStatus?: "completed" | "skipped";
   onSetStatus?: (status: "completed" | "skipped" | "pending") => void;
 }) => {
-  const caloriesByType: Record<string, number> = {
-    Breakfast: 400,
-    Lunch: 550,
-    Dinner: 650,
-    Snacks: 200,
-  };
-  const prepByType: Record<string, number> = {
-    Breakfast: 15,
-    Lunch: 20,
-    Dinner: 30,
-    Snacks: 10,
-  };
+  const fallbackCalories: Record<string, number> = { Breakfast: 400, Lunch: 550, Dinner: 650, Snacks: 200 };
+  const fallbackPrep: Record<string, number> = { Breakfast: 15, Lunch: 20, Dinner: 30, Snacks: 10 };
+  const displayCalories = typeof meal === "object" ? meal.calories : (fallbackCalories[type] ?? 450);
+  const displayPrep = typeof meal === "object" ? meal.prepTime : (fallbackPrep[type] ?? 20);
+  const displayName = mealName(meal);
   const accent = mealTypeAccent[type] ?? {
     border: "border-l-slate-300",
     iconBg: "bg-slate-50",
@@ -368,7 +380,7 @@ const MealCard = ({
             </div>
           </div>
 
-          {meal ? (
+          {displayName ? (
             <p
               className={`text-sm font-medium mt-1 leading-relaxed ${
                 mealStatus === "skipped"
@@ -376,21 +388,21 @@ const MealCard = ({
                   : "text-slate-700"
               }`}
             >
-              {meal}
+              {displayName}
             </p>
           ) : (
             <p className="text-sm text-slate-400 italic mt-1">No meal planned</p>
           )}
 
-          {meal && (
+          {displayName && (
             <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
               <span className="flex items-center gap-1">
                 <Flame className="w-3 h-3 text-orange-400" />~
-                {caloriesByType[type] ?? 450} kcal
+                {displayCalories} kcal
               </span>
               <span className="flex items-center gap-1">
                 <Clock className="w-3 h-3 text-blue-400" />
-                {prepByType[type] ?? 20} min
+                {displayPrep} min
               </span>
             </div>
           )}
@@ -1687,7 +1699,7 @@ export default function MealPlanDashboard() {
                                     )}
                                   </div>
                                   <p className="text-sm font-medium leading-snug line-clamp-2">
-                                    {meal ?? (
+                                    {mealName(meal) || (
                                       <span className="opacity-40 italic text-xs">
                                         Not set
                                       </span>
@@ -2234,7 +2246,7 @@ export default function MealPlanDashboard() {
                                               {label}
                                             </p>
                                             <p className="text-xs text-slate-700 font-medium leading-snug mt-0.5">
-                                              {value || "—"}
+                                              {mealName(value) || "—"}
                                             </p>
                                           </div>
                                         </div>

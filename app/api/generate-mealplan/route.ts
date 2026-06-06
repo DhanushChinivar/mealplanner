@@ -764,7 +764,10 @@ Rules:
 - Ingredient amounts scale with servings count of ${servings} when shopping, but nutritional values are always per person
 - Vary meals across all 7 days — no repeated meals
 - Match ${cuisine || "a balanced international"} cuisine style throughout
-- Tailor macro ratios to support the "${healthProfile?.goal || "Eat Healthier"}" goal`;
+- Tailor macro ratios to support the "${healthProfile?.goal || "Eat Healthier"}" goal
+- Keep description to 1 short sentence only
+- Limit ingredients to 4-5 items per meal (main ingredients only)
+- Use compact JSON — no extra whitespace or newlines inside strings`;
 
     let aiContent = "";
     let lastProviderStatus: number | undefined;
@@ -783,7 +786,7 @@ Rules:
               },
             ],
             temperature: 0.7,
-            max_tokens: 4000,
+            max_tokens: 8000,
           });
 
           aiContent = response.choices?.[0]?.message?.content?.trim() ?? "";
